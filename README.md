@@ -1,6 +1,6 @@
-# stream-prompt-manager
+# PromptStream
 
-A small Vite + React + TypeScript app for creating and managing prompt blocks for streaming workflows.
+A small Vite + React + TypeScript app for creating and managing prompt blocks for better and snappier workflows.
 
 ## Quick start
 
