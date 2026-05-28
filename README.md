@@ -1,3 +1,7 @@
+<div align="center">
+  <img width="1200" alt="Banner" src="banner.webp" />
+</div>
+
 # PromptStream
 
 A small Vite + React + TypeScript app for creating and managing prompt blocks for better and snappier workflows.
