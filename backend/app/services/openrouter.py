@@ -97,8 +97,8 @@ def _call_openrouter(
         headers={
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://prompts.ashref.tn",
-            "X-Title": "prompts.ashref.tn",
+            "HTTP-Referer": "https://prompts.achraf.tn",
+            "X-Title": "prompts.achraf.tn",
         },
         method="POST",
     )

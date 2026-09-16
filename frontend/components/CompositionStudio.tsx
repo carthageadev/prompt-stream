@@ -78,7 +78,7 @@ const CompositionStudio: React.FC<{ compositionId: string }> = ({ compositionId 
   const [preset, setPreset] = React.useState<ExportPreset>('chatgpt');
 
   React.useEffect(() => {
-    document.title = 'Composition Studio | prompts.ashref.tn';
+    document.title = 'Composition Studio | prompts.achraf.tn';
     const run = async () => {
       setIsLoading(true);
       setError(null);

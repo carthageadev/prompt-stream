@@ -884,7 +884,7 @@ const App: React.FC = () => {
           <div className='flex min-w-0 items-center gap-2'>
             <Waves className='text-[var(--app-text-strong)]' size={22} />
             <h1 className='text-sm sm:text-base lg:text-lg font-brand font-semibold tracking-tight text-[var(--app-text-strong)] whitespace-nowrap'>
-              prompts.ashref.tn
+              prompts.achraf.tn
             </h1>
           </div>
 

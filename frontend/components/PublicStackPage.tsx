@@ -70,7 +70,7 @@ const PublicStackPage: React.FC<PublicStackPageProps> = ({ slug }) => {
       try {
         const data = await api.getPublicStack(slug);
         setPayload(data);
-        document.title = `${data.stack.name} | prompts.ashref.tn`;
+        document.title = `${data.stack.name} | prompts.achraf.tn`;
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load stack');
       } finally {
@@ -95,7 +95,7 @@ const PublicStackPage: React.FC<PublicStackPageProps> = ({ slug }) => {
             className='flex items-center gap-3 text-[var(--app-text-strong)]'
           >
             <Waves size={24} />
-            <span className='font-brand text-lg tracking-tight'>prompts.ashref.tn</span>
+            <span className='font-brand text-lg tracking-tight'>prompts.achraf.tn</span>
           </button>
           <div className='flex items-center gap-3'>
             <button
