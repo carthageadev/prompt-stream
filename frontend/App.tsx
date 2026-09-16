@@ -12,6 +12,7 @@ import TagFilterBar from './components/TagFilterBar';
 import StacksBar from './components/StacksBar';
 import SettingsOverlay from './components/SettingsOverlay';
 import StackSettingsOverlay from './components/StackSettingsOverlay';
+import Mixer from './components/Mixer';
 import {
   PromptBlockData,
   SemanticSearchResult,
@@ -36,6 +37,7 @@ import {
   Settings,
   WandSparkles,
   NotebookPen,
+  Server,
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import {
@@ -269,6 +271,10 @@ const App: React.FC = () => {
   // Stacks state
   const [stacks, setStacks] = useState<Stack[]>([]);
   const [activeStackId, setActiveStackId] = useState<string | null>(null);
+
+  // Rack (Mixer) state
+  const [mixerIds, setMixerIds] = useState<string[]>([]);
+  const [isMixerOpen, setIsMixerOpen] = useState(false);
 
   // Settings state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -800,6 +806,94 @@ const App: React.FC = () => {
     setFocusedBlockId(id);
   }, []);
 
+  // ---------------- Rack (Mixer) ----------------
+  // Temporary stubs live only in the Rack, never in the grid.
+  const [stubBlocks, setStubBlocks] = useState<PromptBlockData[]>([]);
+
+  const rackBlocks = useMemo(() => {
+    const byId = new Map(blocks.map((b) => [b.id, b]));
+    const mounted = mixerIds
+      .map((id) => byId.get(id))
+      .filter((b): b is PromptBlockData => Boolean(b));
+    const stubs = stubBlocks.filter((s) => mixerIds.includes(s.id));
+    return [...mounted, ...stubs];
+  }, [blocks, mixerIds, stubBlocks]);
+
+  const handleToggleRack = useCallback(
+    (id: string) => {
+      const isMounted = mixerIds.includes(id);
+      if (isMounted) {
+        setMixerIds((prev) => prev.filter((mid) => mid !== id));
+        setStubBlocks((stubs) => stubs.filter((s) => s.id !== id));
+      } else {
+        setMixerIds((prev) => [...prev, id]);
+        addToast('Mounted to Rack', 'success');
+      }
+    },
+    [addToast, mixerIds],
+  );
+
+  const handleRackUpdateBlock = useCallback(
+    (id: string, updates: Partial<PromptBlockData>) => {
+      if (id.startsWith('stub-')) {
+        setStubBlocks((prev) =>
+          prev.map((s) => (s.id === id ? { ...s, ...updates } : s)),
+        );
+        return;
+      }
+      updateBlock(id, updates);
+    },
+    [updateBlock],
+  );
+
+  const handleRackDeleteBlock = useCallback(
+    (id: string) => {
+      if (id.startsWith('stub-')) {
+        setStubBlocks((prev) => prev.filter((s) => s.id !== id));
+        setMixerIds((prev) => prev.filter((mid) => mid !== id));
+        return;
+      }
+      removeBlock(id);
+      setMixerIds((prev) => prev.filter((mid) => mid !== id));
+    },
+    [removeBlock],
+  );
+
+  const handleReorderRack = useCallback(
+    (newOrder: string[]) => {
+      const byId = new Map(rackBlocks.map((b) => [b.id, b]));
+      const ordered = newOrder
+        .map((id) => byId.get(id))
+        .filter((b): b is PromptBlockData => Boolean(b));
+      setMixerIds(ordered.map((b) => b.id));
+    },
+    [rackBlocks],
+  );
+
+  const handleCreateStub = useCallback(() => {
+    const stub: PromptBlockData = {
+      id: `stub-${nanoid(8)}`,
+      type: 'instruction',
+      title: 'Stub',
+      content: '',
+      tags: [],
+      isTemp: true,
+      isNew: true,
+    };
+
+    setStubBlocks((prev) => [...prev, stub]);
+    setMixerIds((prev) => [...prev, stub.id]);
+    addToast('Stub mounted to Rack', 'info');
+  }, [addToast]);
+
+  const handleRackSaveAsNote = useCallback(
+    async (content: string) => {
+      if (!content.trim()) return;
+      await handleCreateBlock(content);
+    },
+    [handleCreateBlock],
+  );
+
   // Compute filtered blocks
   const gridBlocks = useMemo(() => {
     let filtered = [...blocks];
@@ -913,6 +1007,25 @@ const App: React.FC = () => {
           <div className='flex items-center gap-2 shrink-0'>
             <button
               type='button'
+              onClick={() => setIsMixerOpen((v) => !v)}
+              className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] transition-colors ${
+                isMixerOpen
+                  ? 'border-[var(--app-border-strong)] bg-[var(--app-surface-3)] text-[var(--app-text-strong)]'
+                  : 'border-[var(--app-border)] bg-[var(--app-surface-2)] text-[var(--app-text-subtle)] hover:border-[var(--app-border-strong)] hover:text-[var(--app-text-strong)]'
+              }`}
+              title='Open Rack'
+            >
+              <Server size={14} />
+              <span className='hidden sm:inline'>Rack</span>
+              {mixerIds.length > 0 && (
+                <span className='ml-0.5 rounded-full bg-[var(--app-text-strong)] px-1.5 text-[9px] text-[var(--app-inverse)]'>
+                  {mixerIds.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              type='button'
               onClick={() => navigateTo('/sessions')}
               className='inline-flex items-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-surface-2)] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--app-text-subtle)] transition-colors hover:border-[var(--app-border-strong)] hover:text-[var(--app-text-strong)]'
               title='Open sessions'
@@ -995,6 +1108,8 @@ const App: React.FC = () => {
             semanticReasons={semanticReasonMap}
             onFocus={setFocusedBlockId}
             onAdd={() => setIsCreating(true)}
+            mixerIds={mixerIds}
+            onToggleRack={handleToggleRack}
           />
         </main>
 
@@ -1091,6 +1206,21 @@ const App: React.FC = () => {
         removeToast={(id) =>
           setToasts((prev) => prev.filter((t) => t.id !== id))
         }
+      />
+
+      {/* RACK (MIXER) */}
+      <Mixer
+        isOpen={isMixerOpen}
+        onClose={() => setIsMixerOpen(false)}
+        blocks={rackBlocks}
+        setMixerIds={setMixerIds}
+        onReorder={handleReorderRack}
+        onTriggerToast={(msg, type) => addToast(msg, type)}
+        onCreateTemp={handleCreateStub}
+        onUpdateBlock={handleRackUpdateBlock}
+        onDeleteBlock={handleRackDeleteBlock}
+        onSaveAsNote={handleRackSaveAsNote}
+        isOverlay
       />
     </div>
   );

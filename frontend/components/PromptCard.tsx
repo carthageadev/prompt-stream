@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PromptBlockData, TagColor } from '../types';
-import { Check, Copy, Maximize2, GitBranch, Layers } from 'lucide-react';
+import { Check, Copy, Maximize2, GitBranch, Layers, Plus, Minus } from 'lucide-react';
 import { getTagColorClasses } from '../constants';
 
 interface PromptCardProps {
@@ -11,6 +11,8 @@ interface PromptCardProps {
   showStackOrder: boolean;
   semanticReason?: string;
   onClick: () => void;
+  isInRack?: boolean;
+  onToggleRack?: (id: string) => void;
 }
 
 const PromptCard: React.FC<PromptCardProps> = ({
@@ -21,6 +23,8 @@ const PromptCard: React.FC<PromptCardProps> = ({
   showStackOrder,
   semanticReason,
   onClick,
+  isInRack = false,
+  onToggleRack,
 }) => {
   const [copied, setCopied] = useState(false);
 
@@ -103,6 +107,24 @@ const PromptCard: React.FC<PromptCardProps> = ({
               <Copy size={16} />
             )}
           </button>
+
+          {onToggleRack && (
+            <button
+              type='button'
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleRack(block.id);
+              }}
+              className={`p-1.5 transition-all hover:bg-[var(--app-surface-3)] group-hover:opacity-100 ${
+                isInRack
+                  ? 'text-emerald-500 opacity-100'
+                  : 'text-[var(--app-text-subtle)] opacity-80 hover:text-[var(--app-text-strong)]'
+              }`}
+              title={isInRack ? 'Unmount from Rack' : 'Mount to Rack'}
+            >
+              {isInRack ? <Minus size={16} /> : <Plus size={16} />}
+            </button>
+          )}
         </div>
       </div>
 

@@ -13,6 +13,8 @@ interface PromptGridProps {
   semanticReasons?: Map<string, string>;
   onFocus: (id: string) => void;
   onAdd: () => void;
+  mixerIds?: string[];
+  onToggleRack?: (id: string) => void;
 }
 
 const PromptGrid: React.FC<PromptGridProps> = ({
@@ -25,6 +27,8 @@ const PromptGrid: React.FC<PromptGridProps> = ({
   semanticReasons,
   onFocus,
   onAdd,
+  mixerIds = [],
+  onToggleRack,
 }) => {
   // Create a map for stack id -> name lookup
   const stackMap = new Map(stacks.map((s) => [s.id, s.name]));
@@ -94,6 +98,8 @@ const PromptGrid: React.FC<PromptGridProps> = ({
           showStackOrder={activeStackId !== null}
           semanticReason={semanticReasons?.get(block.id)}
           onClick={() => onFocus(block.id)}
+          isInRack={mixerIds.includes(block.id)}
+          onToggleRack={onToggleRack}
         />
       ))}
     </div>

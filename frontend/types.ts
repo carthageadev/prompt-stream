@@ -28,6 +28,7 @@ export interface PromptBlockData {
   updatedAt?: Date;
   isNew?: boolean;
   isDeleting?: boolean;
+  isTemp?: boolean;
 }
 
 export interface TagColor {

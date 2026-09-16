@@ -18,6 +18,8 @@ import { DEFAULT_TAG_LIGHTNESS } from '../constants';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+export { API_URL };
+
 const jsonHeaders = { 'Content-Type': 'application/json' };
 
 const mapBlock = (block: any): PromptBlockData => ({

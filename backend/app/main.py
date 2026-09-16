@@ -16,6 +16,7 @@ from .database import init_database, seed_database
 from .routes import router as blocks_router
 from .routes.compositions import router as compositions_router
 from .routes.insights import router as insights_router
+from .routes.optimize import router as optimize_router
 from .routes.prompts import router as prompts_router
 from .routes.public import router as public_router
 from .routes.search import router as search_router
@@ -66,6 +67,7 @@ app.include_router(tag_colors_router, prefix="/api")
 app.include_router(public_router, prefix="/api")
 app.include_router(compositions_router, prefix="/api")
 app.include_router(insights_router, prefix="/api")
+app.include_router(optimize_router, prefix="/api")
 app.include_router(search_router, prefix="/api")
 
 

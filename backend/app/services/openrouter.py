@@ -121,6 +121,83 @@ def _call_openrouter(
     return _extract_json_blob(content) if isinstance(content, str) else None
 
 
+def optimize_prompt_text(prompt_fragments: str) -> str:
+    """Merge stacked prompt fragments into a single optimized prompt.
+
+    Returns plain text. Falls back to the original fragments (cleaned up)
+    when OpenRouter is unavailable so the Rack always produces a result.
+    """
+    fragments = prompt_fragments.strip()
+    if not fragments:
+        return ""
+
+    if not OPENROUTER_API_KEY:
+        return _fallback_optimize(fragments)
+
+    payload = {
+        "model": OPENROUTER_SEMANTIC_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You merge and optimize prompt fragments into one cohesive, "
+                    "high-quality prompt. Remove duplication, resolve conflicts, "
+                    "preserve intent, keep it concise and directly usable. "
+                    "Return only the optimized prompt text, no preamble."
+                ),
+            },
+            {"role": "user", "content": fragments},
+        ],
+        "temperature": 0.3,
+    }
+
+    request = urllib.request.Request(
+        "https://openrouter.ai/api/v1/chat/completions",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://prompts.achraf.tn",
+            "X-Title": "prompts.achraf.tn",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=45) as response:
+            body = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, json.JSONDecodeError):
+        return _fallback_optimize(fragments)
+
+    content = (
+        body.get("choices", [{}])[0]
+        .get("message", {})
+        .get("content", "")
+    )
+    if isinstance(content, list):
+        content = "\n".join(
+            part.get("text", "")
+            for part in content
+            if isinstance(part, dict)
+        )
+
+    if isinstance(content, str) and content.strip():
+        return content.strip()
+    return _fallback_optimize(fragments)
+
+
+def _fallback_optimize(fragments: str) -> str:
+    """De-duplicate fragments while preserving order when AI is unavailable."""
+    seen: set[str] = set()
+    lines: list[str] = []
+    for chunk in fragments.split("\n\n"):
+        cleaned = chunk.strip()
+        if cleaned and cleaned not in seen:
+            seen.add(cleaned)
+            lines.append(cleaned)
+    return "\n\n".join(lines)
+
+
 def extract_keywords(content: str, limit: int = 10) -> list[str]:
     words = re.findall(r"[a-zA-Z0-9\+#\.]{3,}", content.lower())
     buckets: dict[str, int] = {}

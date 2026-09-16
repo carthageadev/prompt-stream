@@ -395,3 +395,11 @@ class SemanticSearchResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     database: str
+
+
+class OptimizeRequest(BaseModel):
+    prompt: str
+
+
+class OptimizeResponse(BaseModel):
+    text: str
