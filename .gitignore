@@ -1,9 +1,6 @@
 # Node
 node_modules/
 
-# Turbo
-.turbo/
-
 # Build
 dist/
 dist-ssr/

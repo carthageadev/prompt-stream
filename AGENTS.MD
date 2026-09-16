@@ -1,0 +1,1 @@
+Never use emojis, and be concise, explain your next steps and execute always, don't go in without first giving the user a explanation of the what is goign to happen next concisely.
