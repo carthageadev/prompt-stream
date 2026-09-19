@@ -348,6 +348,44 @@ select.field option {
   animation: panel-out 0.2s var(--ease) both;
 }
 
+/* ─────────────────────────  route transitions  ───────────────────────── */
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.22s;
+  animation-timing-function: var(--ease);
+}
+
+/* ─────────────────────────  overlay exits  ───────────────────────── */
+
+@keyframes overlay-out {
+  from {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(6px) scale(0.99);
+  }
+}
+.animate-overlay-out {
+  animation: overlay-out 0.15s var(--ease) both;
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.animate-fade-out {
+  animation: fade-out 0.15s var(--ease) both;
+}
+
 /* Frosted surface for floating panels. */
 .frost {
   background: color-mix(in oklab, var(--bg-elev) 78%, transparent);
