@@ -98,6 +98,7 @@ export function Studio({
 
   const [newIds, setNewIds] = useState<Set<number>>(new Set());
   const [removing, setRemoving] = useState<Set<number>>(new Set());
+  const [confirmPurgeId, setConfirmPurgeId] = useState<number | null>(null);
   const pendingDeletes = useRef(new Map<number, ReturnType<typeof setTimeout>>());
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -341,11 +342,23 @@ export function Studio({
   const purgeBlock = useCallback(
     async (block: PromptBlock) => {
       setBlocks((prev) => prev.filter((b) => b.id !== block.id));
+      setConfirmPurgeId(null);
       await fetch(`/api/prompts/${block.id}?hard=1`, { method: "DELETE" }).catch(() => undefined);
       toast.push("Prompt deleted permanently.");
     },
     [toast],
   );
+
+  /** Archive trash requires a second click to confirm the permanent delete. */
+  const armPurge = useCallback((id: number) => {
+    setConfirmPurgeId((armed) => {
+      if (armed === id) return armed;
+      setTimeout(() => {
+        setConfirmPurgeId((current) => (current === id ? null : current));
+      }, 4000);
+      return id;
+    });
+  }, []);
 
   const toggleRack = useCallback((block: PromptBlock) => {
     const key = rackKey(block.id);
@@ -870,7 +883,11 @@ export function Studio({
                 <span className="label">{BLOCK_TYPE_META[block.blockType].label}</span>
                 <span className="min-w-0 flex-1 truncate text-[13px] text-ink2">{block.title}</span>
                 <button type="button" onClick={() => saveBlock(block.id, { isArchived: false })} className="btn btn-ghost focus-ring !px-2 !py-1 !text-[11px]"><IconRestore width={12} height={12} /> restore</button>
-                <button type="button" onClick={() => purgeBlock(block)} className="icon-btn focus-ring"><IconTrash width={13} height={13} /></button>
+                {confirmPurgeId === block.id ? (
+                  <button type="button" onClick={() => purgeBlock(block)} className="btn btn-ghost focus-ring !px-2 !py-1 !text-[11px] !text-red-500">sure?</button>
+                ) : (
+                  <button type="button" onClick={() => armPurge(block.id)} title="Delete permanently" className="icon-btn focus-ring"><IconTrash width={13} height={13} /></button>
+                )}
               </div>
             ))}
           </div>
