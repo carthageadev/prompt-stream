@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:neon": "bun run dev.local/dev-neon.ts",
     "build": "vite build",
     "preview": "vite preview",
     "generate-og": "node scripts/generate-og-images.mjs"
