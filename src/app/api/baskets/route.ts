@@ -1,21 +1,25 @@
-import { asc, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { baskets, prompts } from "@/db/schema";
-import { ensureSeed, listBaskets } from "@/lib/data";
+import { listBaskets } from "@/lib/data";
 import { guard, json, readBody } from "@/lib/http";
+import { requireSessionId } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const blocked = guard(request);
   if (blocked) return blocked;
-  await ensureSeed();
-  return json({ baskets: await listBaskets() });
+  const sessionId = await requireSessionId(request);
+  if (typeof sessionId !== "number") return sessionId;
+  return json({ baskets: await listBaskets(sessionId) });
 }
 
 export async function POST(request: Request) {
   const blocked = guard(request);
   if (blocked) return blocked;
+  const sessionId = await requireSessionId(request);
+  if (typeof sessionId !== "number") return sessionId;
 
   const body = await readBody<{ name?: string; promptIds?: number[] }>(request);
   const name = body?.name?.trim();
@@ -24,12 +28,13 @@ export async function POST(request: Request) {
   const last = await db
     .select({ position: baskets.position })
     .from(baskets)
+    .where(eq(baskets.sessionId, sessionId))
     .orderBy(sql`${baskets.position} desc`)
     .limit(1);
 
   const created = await db
     .insert(baskets)
-    .values({ name: name.slice(0, 80), position: (last[0]?.position ?? -1) + 1 })
+    .values({ name: name.slice(0, 80), position: (last[0]?.position ?? -1) + 1, sessionId })
     .returning();
 
   const ids = [...new Set((body?.promptIds ?? []).filter(Number.isFinite))];
@@ -37,7 +42,7 @@ export async function POST(request: Request) {
     await db
       .update(prompts)
       .set({ basketId: created[0].id, updatedAt: new Date() })
-      .where(inArray(prompts.id, ids));
+      .where(and(inArray(prompts.id, ids), eq(prompts.sessionId, sessionId)));
   }
 
   return json(
@@ -57,6 +62,8 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   const blocked = guard(request);
   if (blocked) return blocked;
+  const sessionId = await requireSessionId(request);
+  if (typeof sessionId !== "number") return sessionId;
 
   const body = await readBody<{ basketId?: number | null; promptIds?: number[] }>(request);
   const ids = [...new Set((body?.promptIds ?? []).filter(Number.isFinite))];
@@ -66,7 +73,7 @@ export async function PUT(request: Request) {
     const exists = await db
       .select({ id: baskets.id })
       .from(baskets)
-      .where(eq(baskets.id, body.basketId))
+      .where(and(eq(baskets.id, body.basketId), eq(baskets.sessionId, sessionId)))
       .limit(1);
     if (!exists[0]) return json({ error: "basket not found" }, 404);
   }
@@ -74,7 +81,7 @@ export async function PUT(request: Request) {
   await db
     .update(prompts)
     .set({ basketId: body?.basketId ?? null, updatedAt: new Date() })
-    .where(inArray(prompts.id, ids));
+    .where(and(inArray(prompts.id, ids), eq(prompts.sessionId, sessionId)));
 
   return json({ assigned: ids.length, basketId: body?.basketId ?? null });
 }

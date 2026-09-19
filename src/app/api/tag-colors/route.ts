@@ -1,8 +1,9 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { tagColors } from "@/db/schema";
 import { guard, json, readBody } from "@/lib/http";
 import { listTagColors } from "@/lib/data";
+import { requireSessionId } from "@/lib/session";
 import { deriveTagColor } from "@/lib/tags";
 
 export const dynamic = "force-dynamic";
@@ -10,13 +11,17 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const blocked = guard(request);
   if (blocked) return blocked;
-  return json({ colors: await listTagColors() });
+  const sessionId = await requireSessionId(request);
+  if (typeof sessionId !== "number") return sessionId;
+  return json({ colors: await listTagColors(sessionId) });
 }
 
 /** Upsert a colour, or auto-assign one when only the tag is supplied. */
 export async function PUT(request: Request) {
   const blocked = guard(request);
   if (blocked) return blocked;
+  const sessionId = await requireSessionId(request);
+  if (typeof sessionId !== "number") return sessionId;
   const body = await readBody<{
     tag?: string;
     hue?: number;
@@ -32,9 +37,9 @@ export async function PUT(request: Request) {
 
   await db
     .insert(tagColors)
-    .values({ tag, hue, lightness, updatedAt: new Date() })
+    .values({ tag, hue, lightness, updatedAt: new Date(), sessionId })
     .onConflictDoUpdate({
-      target: tagColors.tag,
+      target: [tagColors.tag, tagColors.sessionId],
       set: { hue, lightness, updatedAt: new Date() },
     });
 
@@ -44,8 +49,12 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   const blocked = guard(request);
   if (blocked) return blocked;
+  const sessionId = await requireSessionId(request);
+  if (typeof sessionId !== "number") return sessionId;
   const tag = new URL(request.url).searchParams.get("tag");
   if (!tag) return json({ error: "tag is required" }, 400);
-  await db.delete(tagColors).where(eq(tagColors.tag, tag));
+  await db
+    .delete(tagColors)
+    .where(and(eq(tagColors.tag, tag), eq(tagColors.sessionId, sessionId)));
   return json({ deleted: true });
 }

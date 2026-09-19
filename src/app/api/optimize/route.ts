@@ -1,8 +1,9 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { prompts } from "@/db/schema";
 import { guard, json, readBody } from "@/lib/http";
 import { mapBlock } from "@/lib/data";
+import { requireSessionId } from "@/lib/session";
 import { heuristicOptimize } from "@/lib/insights";
 import { aiOptimize } from "@/lib/ai";
 
@@ -12,6 +13,8 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const blocked = guard(request);
   if (blocked) return blocked;
+  const sessionId = await requireSessionId(request);
+  if (typeof sessionId !== "number") return sessionId;
 
   const body = await readBody<{
     promptId?: number;
@@ -26,7 +29,11 @@ export async function POST(request: Request) {
   let title = body?.title ?? "Optimized block";
 
   if (Number.isFinite(body?.promptId)) {
-    const rows = await db.select().from(prompts).where(eq(prompts.id, Number(body!.promptId))).limit(1);
+    const rows = await db
+      .select()
+      .from(prompts)
+      .where(and(eq(prompts.id, Number(body!.promptId)), eq(prompts.sessionId, sessionId)))
+      .limit(1);
     if (!rows[0]) return json({ error: "not found" }, 404);
     content = rows[0].content;
     blockType = rows[0].blockType;
@@ -46,6 +53,7 @@ export async function POST(request: Request) {
         content: result,
         blockType,
         tags: [],
+        sessionId,
       })
       .returning();
     return json({ result, source: ai ? "ai" : "heuristic", block: mapBlock(inserted[0]) });

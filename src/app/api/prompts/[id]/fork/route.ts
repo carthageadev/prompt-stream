@@ -1,8 +1,9 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { prompts } from "@/db/schema";
 import { guard, json } from "@/lib/http";
 import { mapBlock } from "@/lib/data";
+import { requireSessionId } from "@/lib/session";
 import { autoTag } from "@/lib/tags";
 
 export const dynamic = "force-dynamic";
@@ -16,8 +17,14 @@ export async function POST(request: Request, ctx: Ctx) {
   const { id } = await ctx.params;
   const parentId = Number(id);
   if (!Number.isFinite(parentId)) return json({ error: "invalid id" }, 400);
+  const sessionId = await requireSessionId(request);
+  if (typeof sessionId !== "number") return sessionId;
 
-  const rows = await db.select().from(prompts).where(eq(prompts.id, parentId)).limit(1);
+  const rows = await db
+    .select()
+    .from(prompts)
+    .where(and(eq(prompts.id, parentId), eq(prompts.sessionId, sessionId)))
+    .limit(1);
   const parent = rows[0];
   if (!parent) return json({ error: "not found" }, 404);
 
@@ -36,6 +43,7 @@ export async function POST(request: Request, ctx: Ctx) {
       tags: autoTag(body.content ?? parent.content, parent.tags ?? []),
       parentPromptId: parent.id,
       rootPromptId: parent.rootPromptId ?? parent.id,
+      sessionId,
     })
     .returning();
 

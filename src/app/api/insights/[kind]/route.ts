@@ -1,8 +1,9 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { insightCache, prompts } from "@/db/schema";
 import { guard, json, readBody } from "@/lib/http";
-import { ensureSeed, listBlocks, mapBlock } from "@/lib/data";
+import { listBlocks, mapBlock } from "@/lib/data";
+import { requireSessionId } from "@/lib/session";
 import { contentHash, heuristicQuality, heuristicRelated, heuristicTags } from "@/lib/insights";
 import { aiQuality, aiTags } from "@/lib/ai";
 import type { BlockType, PromptBlock } from "@/lib/types";
@@ -15,7 +16,8 @@ const KINDS = ["tags", "quality", "related"] as const;
 export async function POST(request: Request, ctx: Ctx) {
   const blocked = guard(request);
   if (blocked) return blocked;
-  await ensureSeed();
+  const sessionId = await requireSessionId(request);
+  if (typeof sessionId !== "number") return sessionId;
 
   const { kind } = await ctx.params;
   if (!(KINDS as readonly string[]).includes(kind)) {
@@ -26,7 +28,11 @@ export async function POST(request: Request, ctx: Ctx) {
   let block: PromptBlock | null = null;
 
   if (Number.isFinite(body?.promptId)) {
-    const rows = await db.select().from(prompts).where(eq(prompts.id, Number(body!.promptId))).limit(1);
+    const rows = await db
+      .select()
+      .from(prompts)
+      .where(and(eq(prompts.id, Number(body!.promptId)), eq(prompts.sessionId, sessionId)))
+      .limit(1);
     if (rows[0]) block = mapBlock(rows[0]);
   } else if (body?.content?.trim()) {
     block = {
@@ -59,7 +65,7 @@ export async function POST(request: Request, ctx: Ctx) {
 
   if (cached[0]) return json({ ...(cached[0].payload as object), cached: true });
 
-  const library = await listBlocks();
+  const library = await listBlocks(sessionId);
   let payload: unknown;
   if (kind === "tags") payload = await aiTags(block, library);
   else if (kind === "quality") payload = await aiQuality(block, library);

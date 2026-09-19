@@ -1,24 +1,28 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { db } from "@/db";
 import { compositions } from "@/db/schema";
-import { ensureSeed, listCompositions } from "@/lib/data";
+import { listCompositions } from "@/lib/data";
+import { currentSessionId } from "@/lib/session";
 import { IconBack, IconLayers, IconPlus } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
 async function createComposition() {
   "use server";
+  const sessionId = await currentSessionId();
+  if (!sessionId) redirect("/");
   const inserted = await db
     .insert(compositions)
-    .values({ title: "Untitled composition", description: "" })
+    .values({ title: "Untitled composition", description: "", sessionId })
     .returning();
   redirect(`/compose/${inserted[0].id}`);
 }
 
 export default async function ComposeIndexPage() {
-  await ensureSeed();
-  const list = await listCompositions();
+  const sessionId = await currentSessionId();
+  if (!sessionId) redirect("/");
+  const list = await listCompositions(sessionId);
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-14">

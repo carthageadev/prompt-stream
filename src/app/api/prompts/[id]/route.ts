@@ -1,8 +1,9 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { prompts } from "@/db/schema";
 import { guard, json, readBody } from "@/lib/http";
 import { lineageFor, mapBlock } from "@/lib/data";
+import { requireSessionId } from "@/lib/session";
 import { autoTag } from "@/lib/tags";
 import { BLOCK_TYPES } from "@/lib/types";
 
@@ -16,13 +17,18 @@ async function loadId(ctx: Ctx): Promise<number | null> {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+const owned = (sessionId: number, id: number) =>
+  and(eq(prompts.id, id), eq(prompts.sessionId, sessionId));
+
 export async function GET(request: Request, ctx: Ctx) {
   const blocked = guard(request);
   if (blocked) return blocked;
+  const sessionId = await requireSessionId(request);
+  if (typeof sessionId !== "number") return sessionId;
   const id = await loadId(ctx);
   if (!id) return json({ error: "invalid id" }, 400);
 
-  const { self, ancestors, descendants, all } = await lineageFor(id);
+  const { self, ancestors, descendants, all } = await lineageFor(sessionId, id);
   if (!self) return json({ error: "not found" }, 404);
   return json({ block: self, ancestors, descendants, library: all });
 }
@@ -44,13 +50,15 @@ type PatchBody = {
 export async function PATCH(request: Request, ctx: Ctx) {
   const blocked = guard(request);
   if (blocked) return blocked;
+  const sessionId = await requireSessionId(request);
+  if (typeof sessionId !== "number") return sessionId;
   const id = await loadId(ctx);
   if (!id) return json({ error: "invalid id" }, 400);
 
   const body = await readBody<PatchBody>(request);
   if (!body) return json({ error: "invalid body" }, 400);
 
-  const existing = await db.select().from(prompts).where(eq(prompts.id, id)).limit(1);
+  const existing = await db.select().from(prompts).where(owned(sessionId, id)).limit(1);
   if (!existing[0]) return json({ error: "not found" }, 404);
 
   const update: Record<string, unknown> = { updatedAt: new Date() };
@@ -77,7 +85,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
     update.tags = autoTag(nextContent, mergedTags);
   }
 
-  const updated = await db.update(prompts).set(update).where(eq(prompts.id, id)).returning();
+  const updated = await db.update(prompts).set(update).where(owned(sessionId, id)).returning();
   return json({ block: mapBlock(updated[0]) });
 }
 
@@ -85,19 +93,21 @@ export async function PATCH(request: Request, ctx: Ctx) {
 export async function DELETE(request: Request, ctx: Ctx) {
   const blocked = guard(request);
   if (blocked) return blocked;
+  const sessionId = await requireSessionId(request);
+  if (typeof sessionId !== "number") return sessionId;
   const id = await loadId(ctx);
   if (!id) return json({ error: "invalid id" }, 400);
 
   const hard = new URL(request.url).searchParams.get("hard") === "1";
   if (hard) {
-    await db.delete(prompts).where(eq(prompts.id, id));
+    await db.delete(prompts).where(owned(sessionId, id));
     return json({ deleted: true, hard: true });
   }
 
   const updated = await db
     .update(prompts)
     .set({ isArchived: true, updatedAt: new Date() })
-    .where(eq(prompts.id, id))
+    .where(owned(sessionId, id))
     .returning();
   if (!updated[0]) return json({ error: "not found" }, 404);
   return json({ archived: true, block: mapBlock(updated[0]) });

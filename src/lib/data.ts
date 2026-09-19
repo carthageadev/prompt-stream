@@ -39,23 +39,31 @@ export const mapStack = (row: StackRow, promptCount = 0): Stack => ({
   promptCount,
 });
 
-export async function listStacks(): Promise<Stack[]> {
-  const rows = await db.select().from(stacks).orderBy(asc(stacks.id));
+export async function listStacks(sessionId: number): Promise<Stack[]> {
+  const rows = await db
+    .select()
+    .from(stacks)
+    .where(eq(stacks.sessionId, sessionId))
+    .orderBy(asc(stacks.id));
   const counts = await db
     .select({ stackId: prompts.stackId, total: sql<number>`count(*)::int` })
     .from(prompts)
-    .where(eq(prompts.isArchived, false))
+    .where(and(eq(prompts.sessionId, sessionId), eq(prompts.isArchived, false)))
     .groupBy(prompts.stackId);
   const totals = new Map(counts.map((row) => [row.stackId, Number(row.total)]));
   return rows.map((row) => mapStack(row, totals.get(row.id) ?? 0));
 }
 
-export async function listBaskets(): Promise<Basket[]> {
-  const rows = await db.select().from(baskets).orderBy(asc(baskets.position), asc(baskets.id));
+export async function listBaskets(sessionId: number): Promise<Basket[]> {
+  const rows = await db
+    .select()
+    .from(baskets)
+    .where(eq(baskets.sessionId, sessionId))
+    .orderBy(asc(baskets.position), asc(baskets.id));
   const counts = await db
     .select({ basketId: prompts.basketId, total: sql<number>`count(*)::int` })
     .from(prompts)
-    .where(eq(prompts.isArchived, false))
+    .where(and(eq(prompts.sessionId, sessionId), eq(prompts.isArchived, false)))
     .groupBy(prompts.basketId);
   const totals = new Map(counts.map((row) => [row.basketId, Number(row.total)]));
   return rows.map((row) => ({
@@ -66,17 +74,26 @@ export async function listBaskets(): Promise<Basket[]> {
   }));
 }
 
-export async function listBlocks(includeArchived = false): Promise<PromptBlock[]> {
+export async function listBlocks(sessionId: number, includeArchived = false): Promise<PromptBlock[]> {
   const rows = await db
     .select()
     .from(prompts)
-    .where(includeArchived ? sql`true` : eq(prompts.isArchived, false))
+    .where(
+      and(
+        eq(prompts.sessionId, sessionId),
+        includeArchived ? sql`true` : eq(prompts.isArchived, false),
+      ),
+    )
     .orderBy(asc(prompts.basketId), asc(prompts.basketOrder), asc(prompts.stackId), asc(prompts.stackOrder), desc(prompts.id));
   return rows.map(mapBlock);
 }
 
-export async function listTagColors(): Promise<TagColor[]> {
-  const rows = await db.select().from(tagColors).orderBy(asc(tagColors.tag));
+export async function listTagColors(sessionId: number): Promise<TagColor[]> {
+  const rows = await db
+    .select()
+    .from(tagColors)
+    .where(eq(tagColors.sessionId, sessionId))
+    .orderBy(asc(tagColors.tag));
   return rows.map((row) => ({ tag: row.tag, hue: row.hue, lightness: row.lightness }));
 }
 
@@ -102,8 +119,12 @@ export async function uniqueSlug(name: string, ignoreId?: number): Promise<strin
   return `${base}-${Date.now().toString(36)}`;
 }
 
-export async function getComposition(id: number): Promise<Composition | null> {
-  const head = await db.select().from(compositions).where(eq(compositions.id, id)).limit(1);
+export async function getComposition(sessionId: number, id: number): Promise<Composition | null> {
+  const head = await db
+    .select()
+    .from(compositions)
+    .where(and(eq(compositions.id, id), eq(compositions.sessionId, sessionId)))
+    .limit(1);
   if (!head[0]) return null;
   const items = await db
     .select()
@@ -126,11 +147,15 @@ export async function getComposition(id: number): Promise<Composition | null> {
   };
 }
 
-export async function listCompositions(): Promise<Composition[]> {
-  const heads = await db.select().from(compositions).orderBy(desc(compositions.updatedAt));
+export async function listCompositions(sessionId: number): Promise<Composition[]> {
+  const heads = await db
+    .select()
+    .from(compositions)
+    .where(eq(compositions.sessionId, sessionId))
+    .orderBy(desc(compositions.updatedAt));
   const out: Composition[] = [];
   for (const head of heads) {
-    const full = await getComposition(head.id);
+    const full = await getComposition(sessionId, head.id);
     if (full) out.push(full);
   }
   return out;
@@ -152,8 +177,8 @@ export async function publicStackBySlug(slug: string) {
 }
 
 /** Lineage lookups: ancestors walk up, descendants walk down. */
-export async function lineageFor(blockId: number) {
-  const all = await listBlocks(true);
+export async function lineageFor(sessionId: number, blockId: number) {
+  const all = await listBlocks(sessionId, true);
   const byId = new Map(all.map((b) => [b.id, b]));
   const self = byId.get(blockId);
   const ancestors: PromptBlock[] = [];
@@ -177,21 +202,21 @@ export async function lineageFor(blockId: number) {
 }
 
 /** Unused stacks / null-stack helpers used by the composer palette. */
-export async function unassignedBlocks(): Promise<PromptBlock[]> {
+export async function unassignedBlocks(sessionId: number): Promise<PromptBlock[]> {
   const rows = await db
     .select()
     .from(prompts)
-    .where(and(eq(prompts.isArchived, false), isNull(prompts.stackId)))
+    .where(and(eq(prompts.sessionId, sessionId), eq(prompts.isArchived, false), isNull(prompts.stackId)))
     .orderBy(asc(prompts.id));
   return rows.map(mapBlock);
 }
 
-export async function blocksByIds(ids: number[]): Promise<PromptBlock[]> {
+export async function blocksByIds(sessionId: number, ids: number[]): Promise<PromptBlock[]> {
   if (!ids.length) return [];
   const rows = await db
     .select()
     .from(prompts)
-    .where(or(...ids.map((id) => eq(prompts.id, id))));
+    .where(and(eq(prompts.sessionId, sessionId), or(...ids.map((id) => eq(prompts.id, id)))));
   return rows.map(mapBlock);
 }
 
@@ -355,39 +380,33 @@ const SEED_BLOCKS: {
   },
 ];
 
-let seedPromise: Promise<void> | null = null;
+/** Seed the demo library into a brand-new session (first session on a fresh DB only). */
+export async function seedSession(sessionId: number): Promise<void> {
+  const stackIds = new Map<string, number>();
+  for (const seed of SEED_STACKS) {
+    const inserted = await db
+      .insert(stacks)
+      .values({ name: seed.name, theme: seed.theme, description: seed.description, sessionId })
+      .returning();
+    stackIds.set(seed.name, inserted[0].id);
+  }
 
-/** Auto-seed on first request so the studio is never empty. */
-export async function ensureSeed(): Promise<void> {
-  if (seedPromise) return seedPromise;
-  seedPromise = (async () => {
-    const existing = await db.select({ id: prompts.id }).from(prompts).limit(1);
-    if (existing.length) return;
-
-    const stackIds = new Map<string, number>();
-    for (const seed of SEED_STACKS) {
-      const inserted = await db
-        .insert(stacks)
-        .values({ name: seed.name, theme: seed.theme, description: seed.description })
-        .returning();
-      stackIds.set(seed.name, inserted[0].id);
-    }
-
-    const blockIds = new Map<string, number>();
-    for (const block of SEED_BLOCKS) {
-      const created = await db
-        .insert(prompts)
-        .values({
-          title: block.title,
-          content: block.content,
-          blockType: block.blockType,
-          stackId: stackIds.get(block.stack) ?? null,
-          stackOrder: block.order,
-          tags: block.tags.length ? block.tags : autoTag(block.content),
-        })
-        .returning({ id: prompts.id });
-      blockIds.set(block.title, created[0].id);
-    }
+  const blockIds = new Map<string, number>();
+  for (const block of SEED_BLOCKS) {
+    const created = await db
+      .insert(prompts)
+      .values({
+        title: block.title,
+        content: block.content,
+        blockType: block.blockType,
+        stackId: stackIds.get(block.stack) ?? null,
+        stackOrder: block.order,
+        tags: block.tags.length ? block.tags : autoTag(block.content),
+        sessionId,
+      })
+      .returning({ id: prompts.id });
+    blockIds.set(block.title, created[0].id);
+  }
 
     const seedBaskets = [
       {
@@ -402,7 +421,7 @@ export async function ensureSeed(): Promise<void> {
     for (let position = 0; position < seedBaskets.length; position += 1) {
       const createdBasket = await db
         .insert(baskets)
-        .values({ name: seedBaskets[position].name, position })
+        .values({ name: seedBaskets[position].name, position, sessionId })
         .returning({ id: baskets.id });
       for (let basketOrder = 0; basketOrder < seedBaskets[position].titles.length; basketOrder += 1) {
         const promptId = blockIds.get(seedBaskets[position].titles[basketOrder]);
@@ -420,6 +439,7 @@ export async function ensureSeed(): Promise<void> {
       .values({
         title: "Deep code review",
         description: "Persona + context + review instruction + output contract.",
+        sessionId,
       })
       .returning();
     const compositionId = comp[0].id;
@@ -441,9 +461,4 @@ export async function ensureSeed(): Promise<void> {
         position: i,
       });
     }
-  })().catch((error) => {
-    seedPromise = null;
-    throw error;
-  });
-  return seedPromise;
 }

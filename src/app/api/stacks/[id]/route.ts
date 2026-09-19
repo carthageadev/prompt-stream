@@ -1,8 +1,9 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { prompts, stacks } from "@/db/schema";
 import { guard, json, readBody, slugify } from "@/lib/http";
 import { mapStack, uniqueSlug } from "@/lib/data";
+import { requireSessionId } from "@/lib/session";
 import { STACK_THEMES } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -25,8 +26,14 @@ export async function PATCH(request: Request, ctx: Ctx) {
     slug?: string | null;
   }>(request);
   if (!body) return json({ error: "invalid body" }, 400);
+  const sessionId = await requireSessionId(request);
+  if (typeof sessionId !== "number") return sessionId;
 
-  const existing = await db.select().from(stacks).where(eq(stacks.id, stackId)).limit(1);
+  const existing = await db
+    .select()
+    .from(stacks)
+    .where(and(eq(stacks.id, stackId), eq(stacks.sessionId, sessionId)))
+    .limit(1);
   if (!existing[0]) return json({ error: "not found" }, 404);
 
   const update: Record<string, unknown> = { updatedAt: new Date() };
@@ -48,7 +55,11 @@ export async function PATCH(request: Request, ctx: Ctx) {
     else if (body.slug) update.slug = slugify(body.slug);
   }
 
-  const updated = await db.update(stacks).set(update).where(eq(stacks.id, stackId)).returning();
+  const updated = await db
+    .update(stacks)
+    .set(update)
+    .where(and(eq(stacks.id, stackId), eq(stacks.sessionId, sessionId)))
+    .returning();
   return json({ stack: mapStack(updated[0]) });
 }
 
@@ -59,8 +70,15 @@ export async function DELETE(request: Request, ctx: Ctx) {
   const { id } = await ctx.params;
   const stackId = Number(id);
   if (!Number.isFinite(stackId)) return json({ error: "invalid id" }, 400);
+  const sessionId = await requireSessionId(request);
+  if (typeof sessionId !== "number") return sessionId;
 
-  await db.update(prompts).set({ stackId: null }).where(eq(prompts.stackId, stackId));
-  await db.delete(stacks).where(eq(stacks.id, stackId));
+  await db
+    .update(prompts)
+    .set({ stackId: null })
+    .where(and(eq(prompts.stackId, stackId), eq(prompts.sessionId, sessionId)));
+  await db
+    .delete(stacks)
+    .where(and(eq(stacks.id, stackId), eq(stacks.sessionId, sessionId)));
   return json({ deleted: true });
 }

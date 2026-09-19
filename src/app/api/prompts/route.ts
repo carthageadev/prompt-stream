@@ -2,7 +2,8 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { prompts } from "@/db/schema";
 import { guard, json, readBody } from "@/lib/http";
-import { ensureSeed, mapBlock } from "@/lib/data";
+import { mapBlock } from "@/lib/data";
+import { requireSessionId } from "@/lib/session";
 import { autoTag } from "@/lib/tags";
 import { BLOCK_TYPES } from "@/lib/types";
 import type { BlockType } from "@/lib/types";
@@ -12,7 +13,8 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const blocked = guard(request);
   if (blocked) return blocked;
-  await ensureSeed();
+  const sessionId = await requireSessionId(request);
+  if (typeof sessionId !== "number") return sessionId;
   const includeArchived = new URL(request.url).searchParams.get("archived") === "1";
   const stackId = new URL(request.url).searchParams.get("stackId");
 
@@ -22,7 +24,7 @@ export async function GET(request: Request) {
   const rows = await db
     .select()
     .from(prompts)
-    .where(where)
+    .where(and(eq(prompts.sessionId, sessionId), where))
     .orderBy(asc(prompts.stackId), asc(prompts.stackOrder), desc(prompts.id));
   return json({ blocks: rows.map(mapBlock) });
 }
@@ -40,7 +42,8 @@ type CreateBody = {
 export async function POST(request: Request) {
   const blocked = guard(request);
   if (blocked) return blocked;
-  await ensureSeed();
+  const sessionId = await requireSessionId(request);
+  if (typeof sessionId !== "number") return sessionId;
 
   const body = await readBody<CreateBody>(request);
   if (!body || !body.content?.trim()) {
@@ -65,6 +68,7 @@ export async function POST(request: Request) {
       stackId: body.stackId ?? null,
       stackOrder: body.stackOrder ?? 1,
       tags,
+      sessionId,
     })
     .returning();
 

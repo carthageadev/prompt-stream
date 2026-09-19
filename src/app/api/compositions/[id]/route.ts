@@ -1,8 +1,9 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { compositionItems, compositions } from "@/db/schema";
 import { guard, json, readBody } from "@/lib/http";
 import { getComposition } from "@/lib/data";
+import { requireSessionId } from "@/lib/session";
 import { COMPOSITION_SECTIONS } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +29,9 @@ export async function GET(request: Request, ctx: Ctx) {
   if (blocked) return blocked;
   const id = await resolveId(ctx);
   if (!id) return json({ error: "invalid id" }, 400);
-  const composition = await getComposition(id);
+  const sessionId = await requireSessionId(request);
+  if (typeof sessionId !== "number") return sessionId;
+  const composition = await getComposition(sessionId, id);
   if (!composition) return json({ error: "not found" }, 404);
   return json({ composition });
 }
@@ -42,8 +45,14 @@ export async function PATCH(request: Request, ctx: Ctx) {
 
   const body = await readBody<{ title?: string; description?: string; items?: ItemPayload[] }>(request);
   if (!body) return json({ error: "invalid body" }, 400);
+  const sessionId = await requireSessionId(request);
+  if (typeof sessionId !== "number") return sessionId;
 
-  const existing = await db.select().from(compositions).where(eq(compositions.id, id)).limit(1);
+  const existing = await db
+    .select()
+    .from(compositions)
+    .where(and(eq(compositions.id, id), eq(compositions.sessionId, sessionId)))
+    .limit(1);
   if (!existing[0]) return json({ error: "not found" }, 404);
 
   await db
@@ -53,7 +62,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
       description: body.description ?? existing[0].description,
       updatedAt: new Date(),
     })
-    .where(eq(compositions.id, id));
+    .where(and(eq(compositions.id, id), eq(compositions.sessionId, sessionId)));
 
   if (Array.isArray(body.items)) {
     await db.delete(compositionItems).where(eq(compositionItems.compositionId, id));
@@ -72,7 +81,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
     if (rows.length) await db.insert(compositionItems).values(rows);
   }
 
-  const composition = await getComposition(id);
+  const composition = await getComposition(sessionId, id);
   return json({ composition });
 }
 
@@ -81,7 +90,15 @@ export async function DELETE(request: Request, ctx: Ctx) {
   if (blocked) return blocked;
   const id = await resolveId(ctx);
   if (!id) return json({ error: "invalid id" }, 400);
+  const sessionId = await requireSessionId(request);
+  if (typeof sessionId !== "number") return sessionId;
+  const owned = await db
+    .select({ id: compositions.id })
+    .from(compositions)
+    .where(and(eq(compositions.id, id), eq(compositions.sessionId, sessionId)))
+    .limit(1);
+  if (!owned[0]) return json({ error: "not found" }, 404);
   await db.delete(compositionItems).where(eq(compositionItems.compositionId, id));
-  await db.delete(compositions).where(eq(compositions.id, id));
+  await db.delete(compositions).where(and(eq(compositions.id, id), eq(compositions.sessionId, sessionId)));
   return json({ deleted: true });
 }
