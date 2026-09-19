@@ -1,24 +1,36 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
-const databaseUrl = process.env.DATABASE_URL;
-
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is required");
-}
+type Db = ReturnType<typeof drizzle>;
 
 const globalForDb = globalThis as typeof globalThis & {
-  __arenaNextJsPostgresqlPool?: Pool;
+  __promptStudioDb?: Db;
 };
 
-export const pool =
-  globalForDb.__arenaNextJsPostgresqlPool ??
-  new Pool({
-    connectionString: databaseUrl,
-  });
-
-if (process.env.NODE_ENV !== "production") {
-  globalForDb.__arenaNextJsPostgresqlPool = pool;
+function createDb(): Db {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error("DATABASE_URL is required");
+  }
+  const pool = new Pool({ connectionString: databaseUrl });
+  return drizzle(pool);
 }
 
-export const db = drizzle(pool);
+/**
+ * Lazily-initialised client. The module must stay import-safe without a
+ * database (e.g. `next build` imports every route to collect page data),
+ * so the pool is only created on first use. At request time a missing
+ * DATABASE_URL still throws loudly.
+ */
+function getDb(): Db {
+  if (!globalForDb.__promptStudioDb) {
+    globalForDb.__promptStudioDb = createDb();
+  }
+  return globalForDb.__promptStudioDb;
+}
+
+export const db: Db = new Proxy({} as Db, {
+  get(_target, prop, receiver) {
+    return Reflect.get(getDb(), prop, receiver);
+  },
+});
