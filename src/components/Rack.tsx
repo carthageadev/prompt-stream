@@ -61,8 +61,8 @@ export function Rack({
   return (
     <>
       <aside
-        className={`fixed right-0 top-0 z-[110] flex h-full w-[min(94vw,380px)] flex-col border-l border-line bg-elev transition-transform duration-300 [transition-timing-function:var(--ease)] ${
-          open ? "translate-x-0" : "translate-x-full"
+        className={`fixed right-0 top-0 z-[110] flex h-full w-[min(94vw,380px)] flex-col border-l border-line bg-elev transition-transform [transition-timing-function:var(--ease)] ${
+          open ? "translate-x-0 duration-300" : "translate-x-full duration-150"
         }`}
         style={{ boxShadow: open ? "var(--shadow-3)" : undefined }}
       >

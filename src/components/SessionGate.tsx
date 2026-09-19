@@ -13,9 +13,11 @@ export function writeSessionCookie(id: number) {
 export function SessionGate({
   current,
   onDone,
+  onClose,
 }: {
   current: SessionRef | null;
   onDone: (session: SessionRef) => void;
+  onClose?: () => void;
 }) {
   const [sessions, setSessions] = useState<SessionRef[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,7 +78,14 @@ export function SessionGate({
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-bg/85 p-5 backdrop-blur-xl">
       <div className="surface w-full max-w-sm px-6 py-7">
-        <p className="label">{current ? "Sessions" : "Welcome to prompt studio"}</p>
+        <div className="flex items-start justify-between gap-4">
+          <p className="label">{current ? "Sessions" : "Welcome to prompt studio"}</p>
+          {current && onClose && (
+            <button type="button" onClick={onClose} className="btn btn-ghost focus-ring !px-2 !py-1 !text-[11px]">
+              back
+            </button>
+          )}
+        </div>
         <h2 className="mt-2 text-[20px] font-semibold tracking-[-0.03em] text-ink">
           {current ? "Switch session" : "Create your session"}
         </h2>

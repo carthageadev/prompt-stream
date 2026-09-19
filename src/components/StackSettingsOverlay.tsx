@@ -34,7 +34,9 @@ export function StackSettingsOverlay({
     setTheme(stack.theme);
   }, [stack]);
 
-  if (!open || !stack) return null;
+  // Note: Overlay handles the exit animation itself, so this stays mounted
+  // while closing (only unmounts when there is nothing to show).
+  if (!stack) return null;
 
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   const publicUrl = slug ? `${origin}/s/${slug}` : "";

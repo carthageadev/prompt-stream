@@ -84,7 +84,9 @@ export function EditorOverlay({
     [block, toast],
   );
 
-  if (!open || !block || !draft) return null;
+  // Note: Overlay handles the exit animation itself, so this stays mounted
+  // while closing (only unmounts when there is nothing to show).
+  if (!block || !draft) return null;
 
   const addTag = (raw: string) => {
     const tag = raw.trim().replace(/,$/, "");

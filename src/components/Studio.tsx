@@ -1232,6 +1232,7 @@ export function Studio({
             setGateOpen(false);
             location.reload();
           }}
+          onClose={() => setGateOpen(false)}
         />
       )}
     </div>

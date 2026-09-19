@@ -186,7 +186,9 @@ export function Overlay({
     return () => window.removeEventListener("keydown", onKey, true);
   }, [open, onClose]);
 
-  if (!open) return null;
+  // Stays mounted through the exit so the panel fades out (faster than it entered).
+  const { mounted, leaving } = useBlurPanel(open, 150);
+  if (!mounted) return null;
 
   return (
     <div className="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto p-4 sm:items-center">
@@ -194,11 +196,11 @@ export function Overlay({
         type="button"
         aria-label="Close overlay"
         onClick={onClose}
-        className="animate-fade-in fixed inset-0 cursor-default"
+        className={`${leaving ? "animate-fade-out" : "animate-fade-in"} fixed inset-0 cursor-default`}
         style={{ background: "color-mix(in oklab, var(--bg) 58%, transparent)", backdropFilter: "blur(2px)" }}
       />
       <div
-        className={`animate-overlay-in relative z-10 my-auto w-full ${width} overflow-hidden border border-line bg-elev shadow-[var(--shadow-3)]`}
+        className={`${leaving ? "animate-overlay-out" : "animate-overlay-in"} relative z-10 my-auto w-full ${width} overflow-hidden border border-line bg-elev shadow-[var(--shadow-3)]`}
       >
         {(title || subtitle) && (
           <header className="flex items-start justify-between gap-4 border-b border-line px-6 py-4">
