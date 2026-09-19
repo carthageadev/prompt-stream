@@ -116,8 +116,8 @@ export function SessionGate({
         <div className="mt-5 border-t border-line pt-4">
           <p className="label mb-2">{current ? "All sessions" : "Pick up where you left off"}</p>
           {loading ? (
-            <div className="space-y-2 py-1" aria-label="Loading sessions">
-              {[0, 1, 2].map((row) => (
+            <div className="h-56 space-y-2 overflow-hidden py-1" aria-label="Loading sessions">
+              {[0, 1, 2, 3].map((row) => (
                 <div key={row} className="flex items-center justify-between px-3 py-2">
                   <span
                     className="skeleton-bar block w-2/3"
@@ -131,9 +131,11 @@ export function SessionGate({
               ))}
             </div>
           ) : sessions.length === 0 ? (
-            <p className="py-2 text-[12.5px] text-ink3">No sessions yet — create the first one above.</p>
+            <div className="flex h-56 items-center justify-center">
+              <p className="py-2 text-[12.5px] text-ink3">No sessions yet — create the first one above.</p>
+            </div>
           ) : (
-            <div className="max-h-56 space-y-1 overflow-y-auto scroll-thin">
+            <div className="h-56 space-y-1 overflow-y-auto scroll-thin">
               {sessions.map((session) => {
                 const active = current?.id === session.id;
                 return (
