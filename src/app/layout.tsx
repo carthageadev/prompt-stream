@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "prompt/studio — prompt engineering workbench",
   description:
     "A prompt engineering studio: tag prompt blocks, group them into stacks, mix them in the rack, and publish compositions.",
+  icons: { icon: "/favicon.svg" },
 };
 
 const themeBootstrap = `
