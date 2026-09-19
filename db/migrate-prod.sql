@@ -13,6 +13,9 @@
 
 BEGIN;
 
+-- Pin the schema so this file behaves identically however it is invoked.
+SET LOCAL search_path TO public;
+
 -- ---------------------------------------------------------------- 1. retire old
 ALTER TABLE IF EXISTS stacks RENAME TO legacy_stacks;
 ALTER TABLE IF EXISTS prompt_blocks RENAME TO legacy_prompt_blocks;
