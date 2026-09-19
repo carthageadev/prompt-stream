@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # Database Service
+  # Database Service (UNCHANGED - holds all live data, never recreated)
   db:
     image: postgres:15-alpine
     container_name: stream-prompts-db
@@ -18,36 +18,17 @@ services:
       timeout: 5s
       retries: 5
 
-  # Backend API Service
-  backend:
+  # Studio (Next.js UI + API, replaces legacy frontend + backend)
+  studio:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
-    container_name: stream-prompts-backend
+    container_name: stream-prompts-studio
     restart: always
     depends_on:
       db:
         condition: service_healthy
-    env_file:
-      - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-      CORS_ORIGINS: ${CORS_ORIGINS}
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgrespassword}@db:5432/stream_prompts
     ports:
-      - '8002:8000'
-
-  # Frontend Web Service
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        - VITE_API_URL=${VITE_API_URL}
-    container_name: stream-prompts-frontend
-    restart: always
-    depends_on:
-      - backend
-    ports:
-      - '3004:80'
-
-
+      - '3004:3000'

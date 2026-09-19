@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+legacy-frontend
+legacy-backend
+scratch.local
+.env
+.env.local
+.env.*.local
+C:\temp
+db_data

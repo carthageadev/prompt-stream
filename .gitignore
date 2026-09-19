@@ -7,6 +7,10 @@ dist-ssr/
 build/
 db_data/
 
+# Next.js
+.next/
+next-env.d.ts
+
 # Vite
 .vite/
 
