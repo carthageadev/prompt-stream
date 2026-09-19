@@ -13,6 +13,7 @@ import { TagBar } from "./TagBar";
 import { QuickCreator } from "./QuickCreator";
 import { EditorOverlay } from "./EditorOverlay";
 import { SettingsOverlay } from "./SettingsOverlay";
+import { SessionGate, type SessionRef } from "./SessionGate";
 import { StackSettingsOverlay } from "./StackSettingsOverlay";
 import {
   IconArchive,
@@ -39,13 +40,18 @@ export function Studio({
   initialStacks,
   initialBaskets,
   initialColors,
+  initialSession,
 }: {
   initialBlocks: PromptBlock[];
   initialStacks: Stack[];
   initialBaskets: Basket[];
   initialColors: TagColor[];
+  initialSession: SessionRef | null;
 }) {
   const toast = useToast();
+
+  const [session, setSession] = useState<SessionRef | null>(initialSession);
+  const [gateOpen, setGateOpen] = useState(initialSession == null);
 
   const [blocks, setBlocks] = useState<PromptBlock[]>(initialBlocks);
   const [stacks, setStacks] = useState<Stack[]>(initialStacks);
@@ -631,6 +637,28 @@ export function Studio({
           <span className="text-[13px] font-semibold tracking-[-0.02em] text-ink">prompt</span>
           <span className="text-[13px] text-ink3">studio</span>
         </Link>
+        <div className="border-b border-line px-5 py-3">
+          <button
+            type="button"
+            onClick={() => setGateOpen(true)}
+            title={session ? "Switch session" : "Choose a session"}
+            className="focus-ring flex w-full items-center gap-2.5 text-left"
+          >
+            <span
+              aria-hidden
+              className="flex h-7 w-7 shrink-0 items-center justify-center text-[13px] font-semibold uppercase"
+              style={{ background: "var(--surface-2)", color: "var(--accent)" }}
+            >
+              {(session?.name ?? "?").slice(0, 1)}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[12.5px] font-medium text-ink">
+                {session?.name ?? "No session"}
+              </span>
+              <span className="block text-[10.5px] text-ink3">switch →</span>
+            </span>
+          </button>
+        </div>
 
         <nav className="flex-1 overflow-y-auto scroll-thin px-3 py-5">
           <p className="label px-2">Library</p>
@@ -1178,6 +1206,17 @@ export function Studio({
           <button type="button" disabled={!basketName.trim()} onClick={() => void createBasketFromSelection()} className="btn btn-primary">Create group</button>
         </div>
       </Overlay>
+
+      {gateOpen && (
+        <SessionGate
+          current={session}
+          onDone={(next) => {
+            setSession(next);
+            setGateOpen(false);
+            location.reload();
+          }}
+        />
+      )}
     </div>
   );
 }
