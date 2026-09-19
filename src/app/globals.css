@@ -362,6 +362,22 @@ input[type="number"] {
   }
 }
 
+/* ─────────────────────────  skeleton  ───────────────────────── */
+
+@keyframes skeleton-pulse {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 0.85;
+  }
+}
+.skeleton-bar {
+  height: 12px;
+  background: var(--surface-2);
+  animation: skeleton-pulse 1.4s var(--ease) infinite alternate;
+}
+
 /* ─────────────────────────  panel motion  ───────────────────────── */
 
 @keyframes panel-in {

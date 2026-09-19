@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Spinner } from "./ui";
 
 export type SessionRef = { id: number; name: string };
 
@@ -108,7 +107,7 @@ export function SessionGate({
             className="field min-w-0 flex-1"
           />
           <button type="button" onClick={create} disabled={busy} className="btn btn-primary focus-ring shrink-0">
-            {busy ? <Spinner /> : "Create"}
+            {busy ? "Creating…" : "Create"}
           </button>
         </div>
 
@@ -117,8 +116,19 @@ export function SessionGate({
         <div className="mt-5 border-t border-line pt-4">
           <p className="label mb-2">{current ? "All sessions" : "Pick up where you left off"}</p>
           {loading ? (
-            <div className="flex items-center gap-2 py-3 text-[12.5px] text-ink3">
-              <Spinner /> Loading…
+            <div className="space-y-2 py-1" aria-label="Loading sessions">
+              {[0, 1, 2].map((row) => (
+                <div key={row} className="flex items-center justify-between px-3 py-2">
+                  <span
+                    className="skeleton-bar block w-2/3"
+                    style={{ animationDelay: `${row * 0.18}s` }}
+                  />
+                  <span
+                    className="skeleton-bar block w-10"
+                    style={{ animationDelay: `${row * 0.18 + 0.09}s` }}
+                  />
+                </div>
+              ))}
             </div>
           ) : sessions.length === 0 ? (
             <p className="py-2 text-[12.5px] text-ink3">No sessions yet — create the first one above.</p>
