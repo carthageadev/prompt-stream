@@ -164,8 +164,73 @@ export function GroupFields({ groups }: { groups: GroupFieldMeta[] }) {
             }
           }
 
+          // Merge linked rects that share an identical span into one outline,
+          // so the shared edge vanishes and only the outside border remains.
+          const findRoot = (p: number[], i: number): number => (p[i] === i ? i : (p[i] = findRoot(p, p[i])));
+          const parent = strokes.map((_, i) => i);
+          const keyOf = (a: number, b: number) => `${a}:${b}`;
+          const vKeys = new Set<string>();
+          const hKeys = new Set<string>();
+          for (const link of links) {
+            if (link.vertical) {
+              const A = strokes[link.upper];
+              const B = strokes[link.lower];
+              if (A && B && A.x === B.x && A.width === B.width) {
+                parent[findRoot(parent, link.upper)] = findRoot(parent, link.lower);
+                vKeys.add(keyOf(link.upper, link.lower));
+              }
+            } else {
+              const L = strokes[link.left];
+              const R = strokes[link.right];
+              if (L && R && L.y === R.y && L.height === R.height) {
+                parent[findRoot(parent, link.left)] = findRoot(parent, link.right);
+                hKeys.add(keyOf(link.left, link.right));
+              }
+            }
+          }
+          const comps = new Map<number, number[]>();
+          strokes.forEach((_, i) => {
+            const root = findRoot(parent, i);
+            if (!comps.has(root)) comps.set(root, []);
+            comps.get(root)!.push(i);
+          });
+          const outlineRects: Rect[] = [];
+          for (const idxs of comps.values()) {
+            if (idxs.length < 2) {
+              outlineRects.push(strokes[idxs[0]]);
+              continue;
+            }
+            const rs = idxs.map((i) => strokes[i]);
+            const sameSpanV = rs.every((r) => r.x === rs[0].x && r.width === rs[0].width);
+            const sameSpanH = rs.every((r) => r.y === rs[0].y && r.height === rs[0].height);
+            let chain = false;
+            if (sameSpanV) {
+              const sorted = [...idxs].sort((p, q) => strokes[p].y - strokes[q].y);
+              chain = sorted.every(
+                (v, k) => k === 0 || vKeys.has(keyOf(sorted[k - 1], v)) || vKeys.has(keyOf(v, sorted[k - 1])),
+              );
+            } else if (sameSpanH) {
+              const sorted = [...idxs].sort((p, q) => strokes[p].x - strokes[q].x);
+              chain = sorted.every(
+                (v, k) => k === 0 || hKeys.has(keyOf(sorted[k - 1], v)) || hKeys.has(keyOf(v, sorted[k - 1])),
+              );
+            }
+            if (chain) {
+              const x0 = Math.min(...rs.map((r) => r.x));
+              const y0 = Math.min(...rs.map((r) => r.y));
+              outlineRects.push({
+                x: x0,
+                y: y0,
+                width: Math.max(...rs.map((r) => r.x + r.width)) - x0,
+                height: Math.max(...rs.map((r) => r.y + r.height)) - y0,
+              });
+            } else {
+              rs.forEach((r) => outlineRects.push(r));
+            }
+          }
+
           const anchor = [...raw].sort((a, b) => a.y - b.y || a.x - b.x)[0];
-          next.push({ ...group, rects, bridges, strokes, anchor });
+          next.push({ ...group, rects, bridges, strokes: outlineRects, anchor });
         }
         setFields(next);
       });
