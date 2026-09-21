@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { prompts } from "@/db/schema";
+import { prompts, stacks } from "@/db/schema";
 import { guard, json, readBody } from "@/lib/http";
 import { mapBlock } from "@/lib/data";
 import { resolveSessions } from "@/lib/session";
@@ -60,6 +60,15 @@ export async function POST(request: Request) {
 
   const firstLine = body.content.trim().split("\n")[0].replace(/^#+\s*/, "").slice(0, 70);
   const title = body.title?.trim() || firstLine || "Untitled block";
+
+  if (body.stackId != null) {
+    const owner = await db
+      .select({ id: stacks.id })
+      .from(stacks)
+      .where(and(eq(stacks.id, body.stackId), eq(stacks.sessionId, sessionId)))
+      .limit(1);
+    if (!owner[0]) return json({ error: "stack not found" }, 400);
+  }
 
   const inserted = await db
     .insert(prompts)

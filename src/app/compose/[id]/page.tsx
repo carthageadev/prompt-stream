@@ -29,7 +29,7 @@ export default async function ComposePage({ params }: { params: Promise<{ id: st
             <h1 className="truncate text-[14px] font-semibold tracking-tight">{composition.title}</h1>
           </div>
         </header>
-        <Composer composition={composition} library={blocks} />
+        <Composer composition={composition} library={blocks} readOnly={composition.sessionId !== resolved.active} />
       </main>
     </ToastProvider>
   );

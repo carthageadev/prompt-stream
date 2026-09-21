@@ -55,7 +55,7 @@ export function sectionForBlock(block: PromptBlock): CompositionSection {
   return TYPE_TO_SECTION[block.blockType] ?? "freeform";
 }
 
-export function Composer({ composition, library }: { composition: Composition; library: PromptBlock[] }) {
+export function Composer({ composition, library, readOnly = false }: { composition: Composition; library: PromptBlock[]; readOnly?: boolean }) {
   const toast = useToast();
   const [title, setTitle] = useState(composition.title);
   const [items, setItems] = useState<DraftItem[]>(
@@ -101,12 +101,12 @@ export function Composer({ composition, library }: { composition: Composition; l
   }, [composition.description, composition.id, items, title, toast]);
 
   useEffect(() => {
-    if (!dirty.current) return;
+    if (readOnly || !dirty.current) return;
     const handle = setTimeout(() => {
       void patch();
     }, 700);
     return () => clearTimeout(handle);
-  }, [items, title, patch]);
+  }, [items, title, patch, readOnly]);
 
   const touch = () => {
     dirty.current = true;
@@ -198,6 +198,11 @@ export function Composer({ composition, library }: { composition: Composition; l
 
   return (
     <div className="grid gap-4 p-5 lg:grid-cols-[272px_1fr_1fr]">
+      {readOnly && (
+        <p className="label border border-line bg-surface px-4 py-2.5 lg:col-span-3">
+          Read-only — this composition belongs to another session. Export still works.
+        </p>
+      )}
       <section className="surface flex max-h-[80vh] flex-col p-3">
         <h2 className="label px-0.5">Library</h2>
         <div className="relative mt-2">
@@ -210,6 +215,7 @@ export function Composer({ composition, library }: { composition: Composition; l
           />
         </div>
         <div className="mt-2 flex-1 space-y-1 overflow-y-auto scroll-thin pr-0.5">
+          <fieldset disabled={readOnly} className="contents space-y-1">
           {palette.map((block) => (
             <button
               key={block.id}
@@ -222,10 +228,12 @@ export function Composer({ composition, library }: { composition: Composition; l
               <span className="mt-0.5 block truncate text-[10.5px] text-ink3">{block.tags.join(" · ")}</span>
             </button>
           ))}
+          </fieldset>
         </div>
       </section>
 
       <section className="surface flex max-h-[80vh] flex-col p-4">
+        <fieldset disabled={readOnly} className="contents">
         <div className="flex items-center gap-2">
           <input
             value={title}
@@ -304,6 +312,7 @@ export function Composer({ composition, library }: { composition: Composition; l
           <IconPlus width={12} height={12} />
           inline item
         </button>
+        </fieldset>
       </section>
 
       <section className="surface flex max-h-[80vh] flex-col p-4">

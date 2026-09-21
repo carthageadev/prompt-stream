@@ -4,13 +4,15 @@ import { useEffect, useState } from "react";
 import type { PromptBlock, TagColor } from "@/lib/types";
 import { tagCss } from "@/lib/tags";
 import { Chip } from "./ui";
-import { IconCheck, IconCopy, IconMinus, IconPlus } from "./icons";
+import { IconCheck, IconClose, IconCopy, IconFork, IconMinus, IconPlus } from "./icons";
 
 export type CardHandles = {
   onOpen: (block: PromptBlock) => void;
   onCopy: (block: PromptBlock) => void;
   onToggleRack: (block: PromptBlock) => void;
   inRack: (id: number) => boolean;
+  onHide?: (block: PromptBlock) => void;
+  onDuplicate?: (block: PromptBlock) => void;
 };
 
 export type CardGroup = {
@@ -38,6 +40,7 @@ export function PromptCard({
   selected = false,
   onSelect,
   group = null,
+  readOnly = false,
 }: {
   block: PromptBlock;
   visible: boolean;
@@ -50,6 +53,8 @@ export function PromptCard({
   selected?: boolean;
   onSelect?: (id: number) => void;
   group?: CardGroup | null;
+  /** Someone else's row: no editor, no select — hide or save a copy instead. */
+  readOnly?: boolean;
 }) {
   const [flash, setFlash] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -69,7 +74,13 @@ export function PromptCard({
   return (
     <article
       data-card-group={group?.id ?? undefined}
-      onClick={() => (organizing ? onSelect?.(block.id) : handles.onOpen(block))}
+      onClick={() => {
+        if (organizing) {
+          if (!readOnly) onSelect?.(block.id);
+          return;
+        }
+        if (!readOnly) handles.onOpen(block);
+      }}
       className={[
         "group relative z-10 mb-3 break-inside-avoid cursor-pointer overflow-hidden border bg-surface transition-all duration-[380ms] [transition-timing-function:var(--ease)]",
         shown
@@ -84,9 +95,13 @@ export function PromptCard({
           {block.title}
         </h3>
         {organizing ? (
-          <span className={`check ${selected ? "on" : ""}`}>
-            <IconCheck width={11} height={11} />
-          </span>
+          readOnly ? (
+            <span className="num shrink-0 pt-[3px] text-[10px] text-ink3">shared</span>
+          ) : (
+            <span className={`check ${selected ? "on" : ""}`}>
+              <IconCheck width={11} height={11} />
+            </span>
+          )
         ) : (
           <span className="num shrink-0 pt-[3px] text-[10px] text-ink3">
             {String(block.stackOrder).padStart(2, "0")}
@@ -150,6 +165,36 @@ export function PromptCard({
               >
                 {inRack ? <IconMinus width={13} height={13} /> : <IconPlus width={13} height={13} />}
               </button>
+              {readOnly && (
+                <>
+                  <button
+                    type="button"
+                    aria-label="Save a copy to your session"
+                    title="Save a copy to your session"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handles.onDuplicate?.(block);
+                    }}
+                    className="icon-btn focus-ring !h-7 !w-7"
+                    style={{ borderColor: "var(--line)", background: "var(--surface)" }}
+                  >
+                    <IconFork width={13} height={13} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Hide from your view"
+                    title="Hide from your view (owner keeps it)"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handles.onHide?.(block);
+                    }}
+                    className="icon-btn focus-ring !h-7 !w-7"
+                    style={{ borderColor: "var(--line)", background: "var(--surface)" }}
+                  >
+                    <IconClose width={13} height={13} />
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>

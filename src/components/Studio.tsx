@@ -14,6 +14,11 @@ import { QuickCreator } from "./QuickCreator";
 import { EditorOverlay } from "./EditorOverlay";
 import { SettingsOverlay } from "./SettingsOverlay";
 import { SessionGate, type SessionRef } from "./SessionGate";
+import {
+  hidePromptId,
+  readHiddenIds,
+  unhidePromptId,
+} from "@/lib/session-client";
 import { StackSettingsOverlay } from "./StackSettingsOverlay";
 import {
   IconArchive,
@@ -52,6 +57,7 @@ export function Studio({
 
   const [session, setSession] = useState<SessionRef | null>(initialSession);
   const [gateOpen, setGateOpen] = useState(initialSession == null);
+  const [hiddenIds, setHiddenIds] = useState<Set<number>>(() => new Set(readHiddenIds()));
 
   const [blocks, setBlocks] = useState<PromptBlock[]>(initialBlocks);
   const [stacks, setStacks] = useState<Stack[]>(initialStacks);
@@ -99,6 +105,11 @@ export function Studio({
   const [newIds, setNewIds] = useState<Set<number>>(new Set());
   const [removing, setRemoving] = useState<Set<number>>(new Set());
   const [confirmPurgeId, setConfirmPurgeId] = useState<number | null>(null);
+
+  const isOwn = useCallback(
+    (block: PromptBlock) => newIds.has(block.id) || block.sessionId === session?.id,
+    [newIds, session],
+  );
   const pendingDeletes = useRef(new Map<number, ReturnType<typeof setTimeout>>());
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -109,7 +120,11 @@ export function Studio({
   const activeStack = typeof filter === "number" ? stacks.find((s) => s.id === filter) ?? null : null;
 
   const liveBlocks = useMemo(() => blocks.filter((b) => !b.isArchived), [blocks]);
-  const archivedBlocks = useMemo(() => blocks.filter((b) => b.isArchived), [blocks]);
+  // Archives is your own trash: only the active session's archived rows, never hidden ones.
+  const archivedBlocks = useMemo(
+    () => blocks.filter((b) => b.isArchived && (newIds.has(b.id) || b.sessionId === session?.id)),
+    [blocks, newIds, session],
+  );
 
   const tagCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -137,10 +152,15 @@ export function Studio({
 
   const pool = useMemo(() => {
     if (filter === "archived") return archivedBlocks;
-    if (filter === "unassigned") return liveBlocks.filter((b) => b.stackId === null);
-    if (typeof filter === "number") return liveBlocks.filter((b) => b.stackId === filter);
-    return liveBlocks;
-  }, [filter, liveBlocks, archivedBlocks]);
+    const base =
+      filter === "unassigned"
+        ? liveBlocks.filter((b) => b.stackId === null)
+        : typeof filter === "number"
+          ? liveBlocks.filter((b) => b.stackId === filter)
+          : liveBlocks;
+    // Hidden rows stay out of your view (per-browser; nothing is deleted).
+    return base.filter((b) => !hiddenIds.has(b.id));
+  }, [filter, liveBlocks, archivedBlocks, hiddenIds]);
 
   const { visibleIds, matches } = useMemo(() => {
     const visible = new Set<number>();
@@ -378,8 +398,46 @@ export function Studio({
       },
       onToggleRack: toggleRack,
       inRack: (id) => rackItems.some((item) => item.key === rackKey(id)),
+      onHide: (block) => {
+        hidePromptId(block.id);
+        setHiddenIds((prev) => new Set(prev).add(block.id));
+        toast.push("Hidden from your view.", {
+          action: {
+            label: "Undo",
+            run: () => {
+              unhidePromptId(block.id);
+              setHiddenIds((prev) => {
+                const next = new Set(prev);
+                next.delete(block.id);
+                return next;
+              });
+            },
+          },
+        });
+      },
+      onDuplicate: async (block) => {
+        try {
+          const res = await fetch("/api/prompts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: `${block.title} (copy)`,
+              content: block.content,
+              blockType: block.blockType,
+              tags: block.tags,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.block) throw new Error(data.error ?? "copy failed");
+          setBlocks((prev) => [data.block, ...prev]);
+          flashNew(data.block.id);
+          toast.success(`Saved a copy to ${session?.name ?? "your session"}.`);
+        } catch (error) {
+          toast.error((error as Error).message);
+        }
+      },
     }),
-    [rackItems, toggleRack, toast],
+    [rackItems, toggleRack, toast, session],
   );
 
   const overlayOpen = quickOpen || editingId !== null || settingsOpen || stackSettingsId !== null;
@@ -717,6 +775,7 @@ export function Studio({
                     type="button"
                     onClick={() => setFilter(stack.id)}
                     onDoubleClick={() => {
+                      if (stack.sessionId !== session?.id) return;
                       setRenaming(stack.id);
                       setRenameValue(stack.name);
                     }}
@@ -727,7 +786,7 @@ export function Studio({
                     <span className="num text-[10px] text-ink3">{liveBlocks.filter((b) => b.stackId === stack.id).length}</span>
                   </button>
                 )}
-                {filter === stack.id && (
+                {filter === stack.id && stack.sessionId === session?.id && (
                   <button type="button" onClick={() => setStackSettingsId(stack.id)} aria-label="Stack settings" className="icon-btn focus-ring !h-6 !w-6 opacity-0 group-hover/stack:opacity-100">
                     <IconSettings width={11} height={11} />
                   </button>
@@ -785,7 +844,7 @@ export function Studio({
             <p className="mt-1 text-[11.5px] text-ink3">
               {filter === "archived"
                 ? `${archivedBlocks.length} stored away`
-                : `${visibleIds.size} of ${pool.length} visible${basketSections.sections.length ? ` · ${basketSections.sections.length} group${basketSections.sections.length === 1 ? "" : "s"}` : ""}`}
+                : `${visibleIds.size} of ${pool.length} visible${basketSections.sections.length ? ` · ${basketSections.sections.length} group${basketSections.sections.length === 1 ? "" : "s"}` : ""}${session ? ` · creating in ${session.name}` : ""}`}
             </p>
           </div>
 
@@ -956,6 +1015,7 @@ export function Studio({
                     organizing={organizing}
                     selected={selectedIds.has(block.id)}
                     onSelect={toggleSelected}
+                    readOnly={!isOwn(block)}
                     group={
                       envelope && block.basketId
                         ? {
@@ -1020,12 +1080,13 @@ export function Studio({
                       <button
                         type="button"
                         onDoubleClick={() => {
+                          if (basket.sessionId !== session?.id) return;
                           setRenamingBasketId(basket.id);
                           setRenamingBasketName(basket.name);
                         }}
                         className="focus-ring truncate text-[12.5px] font-semibold tracking-[-0.01em]"
                         style={{ color: envelope.label }}
-                        title="Double-click to rename"
+                        title={basket.sessionId === session?.id ? "Double-click to rename" : "Shared group"}
                       >
                         {basket.name}
                       </button>
@@ -1033,13 +1094,15 @@ export function Studio({
 
                     <span className="num text-[10px] text-ink3">{visibleCount}</span>
 
-                    <button
-                      type="button"
-                      onClick={() => deleteBasket(basket.id)}
-                      className="btn btn-ghost focus-ring ml-auto !px-2 !py-0.5 !text-[10.5px] opacity-0 transition-opacity duration-200 hover:!text-ink focus-within:opacity-100 group-hover:opacity-100"
-                    >
-                      ungroup
-                    </button>
+                    {basket.sessionId === session?.id && (
+                      <button
+                        type="button"
+                        onClick={() => deleteBasket(basket.id)}
+                        className="btn btn-ghost focus-ring ml-auto !px-2 !py-0.5 !text-[10.5px] opacity-0 transition-opacity duration-200 hover:!text-ink focus-within:opacity-100 group-hover:opacity-100"
+                      >
+                        ungroup
+                      </button>
+                    )}
                   </header>
 
                   {!collapsed && (
@@ -1057,6 +1120,7 @@ export function Studio({
                           organizing={organizing}
                           selected={selectedIds.has(block.id)}
                           onSelect={toggleSelected}
+                          readOnly={!isOwn(block)}
                         />
                       ))}
                     </div>
@@ -1087,6 +1151,7 @@ export function Studio({
                       organizing={organizing}
                       selected={selectedIds.has(block.id)}
                       onSelect={toggleSelected}
+                      readOnly={!isOwn(block)}
                     />
                   ))}
                 </div>

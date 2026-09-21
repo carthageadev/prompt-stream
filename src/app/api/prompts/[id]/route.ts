@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { prompts } from "@/db/schema";
+import { baskets, prompts, stacks } from "@/db/schema";
 import { guard, json, readBody } from "@/lib/http";
 import { lineageFor, mapBlock } from "@/lib/data";
 import { resolveSessions } from "@/lib/session";
@@ -69,10 +69,26 @@ export async function PATCH(request: Request, ctx: Ctx) {
     update.blockType = body.blockType;
   }
   if (body.stackId !== undefined) update.stackId = body.stackId;
+  if (body.stackId != null) {
+    const owner = await db
+      .select({ id: stacks.id })
+      .from(stacks)
+      .where(and(eq(stacks.id, body.stackId), eq(stacks.sessionId, sessionId)))
+      .limit(1);
+    if (!owner[0]) return json({ error: "stack not found" }, 400);
+  }
   if (typeof body.stackOrder === "number") {
     update.stackOrder = Math.max(1, Math.min(99, Math.round(body.stackOrder)));
   }
   if (body.basketId !== undefined) update.basketId = body.basketId;
+  if (body.basketId != null) {
+    const owner = await db
+      .select({ id: baskets.id })
+      .from(baskets)
+      .where(and(eq(baskets.id, body.basketId), eq(baskets.sessionId, sessionId)))
+      .limit(1);
+    if (!owner[0]) return json({ error: "basket not found" }, 400);
+  }
   if (typeof body.basketOrder === "number") {
     update.basketOrder = Math.max(1, Math.min(999, Math.round(body.basketOrder)));
   }
