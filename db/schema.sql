@@ -99,14 +99,3 @@ CREATE TABLE IF NOT EXISTS insight_cache (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS insight_cache_key ON insight_cache (content_hash);
-
-CREATE TABLE IF NOT EXISTS note_sessions (
-  id SERIAL PRIMARY KEY,
-  session_id INTEGER NOT NULL,
-  title TEXT NOT NULL DEFAULT '',
-  body TEXT NOT NULL DEFAULT '',
-  attachments JSONB NOT NULL DEFAULT '[]',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS note_sessions_session_idx ON note_sessions (session_id);

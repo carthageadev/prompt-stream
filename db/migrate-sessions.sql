@@ -41,6 +41,8 @@ ALTER TABLE prompts ALTER COLUMN session_id SET NOT NULL;
 ALTER TABLE tag_colors ALTER COLUMN session_id SET NOT NULL;
 ALTER TABLE compositions ALTER COLUMN session_id SET NOT NULL;
 
+DROP INDEX IF EXISTS tag_colors_tag_key;
+CREATE UNIQUE INDEX tag_colors_tag_key ON tag_colors (tag, session_id);
 CREATE INDEX stacks_session_idx ON stacks (session_id);
 CREATE INDEX baskets_session_idx ON baskets (session_id);
 CREATE INDEX prompts_session_idx ON prompts (session_id);
