@@ -40,6 +40,8 @@ function SessionsWorkbench() {
   const searchRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const hydrated = useRef(false);
+  const [mode, setMode] = useState<"cloud" | "local">("local");
+  const [workspaceName, setWorkspaceName] = useState<string | null>(null);
 
   /* ------------------------------- storage ------------------------------- */
   const load = useCallback(() => {
@@ -53,6 +55,12 @@ function SessionsWorkbench() {
     }
     hydrated.current = true;
   }, []);
+
+  const readWorkspaceId = () => {
+    const match = document.cookie.match(/(?:^|;\s*)ps_session=([^;]+)/);
+    const id = Number(match ? decodeURIComponent(match[1]) : NaN);
+    return Number.isInteger(id) && id > 0 ? id : null;
+  };
 
   const persist = useCallback(
     (next: SessionNote[]) => {
@@ -75,6 +83,26 @@ function SessionsWorkbench() {
     fetch("/api/prompts")
       .then((res) => res.json())
       .then((data: { blocks?: PromptBlock[] }) => setLibrary(data.blocks ?? []))
+      .catch(() => undefined);
+    // Cloud notes when a workspace session is active, local drafts otherwise.
+    fetch("/api/note-sessions")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { notes?: SessionNote[] } | null) => {
+        if (!data) return;
+        setSessions(data.notes ?? []);
+        setActiveId(data.notes?.[0]?.id ?? null);
+        setMode("cloud");
+        hydrated.current = true;
+        const wid = readWorkspaceId();
+        if (wid != null) {
+          fetch("/api/sessions")
+            .then((res) => res.json())
+            .then((list: { sessions?: { id: number; name: string }[] }) => {
+              setWorkspaceName(list.sessions?.find((s) => s.id === wid)?.name ?? null);
+            })
+            .catch(() => undefined);
+        }
+      })
       .catch(() => undefined);
   }, [load]);
 
@@ -106,14 +134,37 @@ function SessionsWorkbench() {
     );
   };
 
-  // Debounced autosave.
+  // Debounced autosave: localStorage drafts offline, PATCH in cloud mode.
   useEffect(() => {
     if (!hydrated.current || !active) return;
+    if (mode === "cloud") {
+      const note = active;
+      const handle = setTimeout(() => {
+        fetch(`/api/note-sessions/${encodeURIComponent(note.id)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: note.title, body: note.body, attachments: note.attachments }),
+        }).catch(() => undefined);
+      }, 400);
+      return () => clearTimeout(handle);
+    }
     const handle = setTimeout(() => persist(sessions), 400);
     return () => clearTimeout(handle);
-  }, [sessions, active, persist]);
+  }, [sessions, active, mode, persist]);
 
   const createSession = () => {
+    if (mode === "cloud") {
+      fetch("/api/note-sessions", { method: "POST" })
+        .then((res) => res.json())
+        .then((data: { note?: SessionNote }) => {
+          if (!data.note) return;
+          setSessions((prev) => [data.note!, ...prev]);
+          setActiveId(data.note!.id);
+          setTimeout(() => bodyRef.current?.focus(), 50);
+        })
+        .catch(() => toast.error("Could not create note."));
+      return;
+    }
     const note: SessionNote = {
       id: uid(),
       title: "",
@@ -132,9 +183,12 @@ function SessionsWorkbench() {
   };
 
   const deleteSession = (id: string) => {
+    if (mode === "cloud") {
+      fetch(`/api/note-sessions/${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => undefined);
+    }
     setSessions((prev) => {
       const next = prev.filter((session) => session.id !== id);
-      persist(next);
+      if (mode === "local") persist(next);
       return next;
     });
     setActiveId((current) => (current === id ? null : current));
@@ -228,7 +282,9 @@ function SessionsWorkbench() {
           </Link>
           <span className="h-3 w-px bg-line" />
           <h1 className="text-[13.5px] font-semibold tracking-[-0.02em] text-ink">Sessions</h1>
-          <span className="label">local-only · never leaves this browser</span>
+          <span className="label">
+            {mode === "cloud" ? `synced · ${workspaceName ?? "session"}` : "local draft · pick a session on the studio page to sync"}
+          </span>
 
           <div className="ml-auto flex items-center gap-2">
             <input
