@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { baskets, prompts } from "@/db/schema";
 import { guard, json, readBody } from "@/lib/http";
-import { requireSessionId } from "@/lib/session";
+import { resolveSessions } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -22,11 +22,12 @@ export async function PATCH(request: Request, ctx: Ctx) {
   if (blocked) return blocked;
   const id = await resolveId(ctx);
   if (!id) return json({ error: "invalid id" }, 400);
-  const sessionId = await requireSessionId(request);
-  if (typeof sessionId !== "number") return sessionId;
 
   const body = await readBody<{ name?: string; position?: number }>(request);
   if (!body) return json({ error: "invalid body" }, 400);
+  const resolved = await resolveSessions(request);
+  if (!("active" in resolved)) return resolved;
+  const sessionId = resolved.active;
 
   const update: Partial<typeof baskets.$inferInsert> = { updatedAt: new Date() };
   if (body.name?.trim()) update.name = body.name.trim().slice(0, 80);
@@ -43,8 +44,9 @@ export async function DELETE(request: Request, ctx: Ctx) {
   if (blocked) return blocked;
   const id = await resolveId(ctx);
   if (!id) return json({ error: "invalid id" }, 400);
-  const sessionId = await requireSessionId(request);
-  if (typeof sessionId !== "number") return sessionId;
+  const resolved = await resolveSessions(request);
+  if (!("active" in resolved)) return resolved;
+  const sessionId = resolved.active;
 
   await db
     .update(prompts)

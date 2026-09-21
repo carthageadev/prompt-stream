@@ -3,23 +3,24 @@ import { db } from "@/db";
 import { baskets, prompts } from "@/db/schema";
 import { listBaskets } from "@/lib/data";
 import { guard, json, readBody } from "@/lib/http";
-import { requireSessionId } from "@/lib/session";
+import { resolveSessions } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const blocked = guard(request);
   if (blocked) return blocked;
-  const sessionId = await requireSessionId(request);
-  if (typeof sessionId !== "number") return sessionId;
-  return json({ baskets: await listBaskets(sessionId) });
+  const resolved = await resolveSessions(request);
+  if (!("active" in resolved)) return resolved;
+  return json({ baskets: await listBaskets(resolved.visible) });
 }
 
 export async function POST(request: Request) {
   const blocked = guard(request);
   if (blocked) return blocked;
-  const sessionId = await requireSessionId(request);
-  if (typeof sessionId !== "number") return sessionId;
+  const resolved = await resolveSessions(request);
+  if (!("active" in resolved)) return resolved;
+  const sessionId = resolved.active;
 
   const body = await readBody<{ name?: string; promptIds?: number[] }>(request);
   const name = body?.name?.trim();
@@ -62,8 +63,9 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   const blocked = guard(request);
   if (blocked) return blocked;
-  const sessionId = await requireSessionId(request);
-  if (typeof sessionId !== "number") return sessionId;
+  const resolved = await resolveSessions(request);
+  if (!("active" in resolved)) return resolved;
+  const sessionId = resolved.active;
 
   const body = await readBody<{ basketId?: number | null; promptIds?: number[] }>(request);
   const ids = [...new Set((body?.promptIds ?? []).filter(Number.isFinite))];

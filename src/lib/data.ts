@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { baskets, compositionItems, compositions, prompts, stacks, tagColors } from "@/db/schema";
 import type { Basket, BlockType, Composition, PromptBlock, Stack, StackTheme, TagColor } from "./types";
@@ -15,6 +15,7 @@ export const mapBlock = (row: BlockRow): PromptBlock => ({
   title: row.title,
   content: row.content,
   blockType: row.blockType as BlockType,
+  sessionId: row.sessionId,
   stackId: row.stackId,
   stackOrder: row.stackOrder,
   basketId: row.basketId,
@@ -36,51 +37,53 @@ export const mapStack = (row: StackRow, promptCount = 0): Stack => ({
   coverImageUrl: row.coverImageUrl,
   theme: row.theme as StackTheme,
   isPublic: row.isPublic,
+  sessionId: row.sessionId,
   promptCount,
 });
 
-export async function listStacks(sessionId: number): Promise<Stack[]> {
+export async function listStacks(sessionIds: number[]): Promise<Stack[]> {
   const rows = await db
     .select()
     .from(stacks)
-    .where(eq(stacks.sessionId, sessionId))
+    .where(inArray(stacks.sessionId, sessionIds))
     .orderBy(asc(stacks.id));
   const counts = await db
     .select({ stackId: prompts.stackId, total: sql<number>`count(*)::int` })
     .from(prompts)
-    .where(and(eq(prompts.sessionId, sessionId), eq(prompts.isArchived, false)))
+    .where(and(inArray(prompts.sessionId, sessionIds), eq(prompts.isArchived, false)))
     .groupBy(prompts.stackId);
   const totals = new Map(counts.map((row) => [row.stackId, Number(row.total)]));
   return rows.map((row) => mapStack(row, totals.get(row.id) ?? 0));
 }
 
-export async function listBaskets(sessionId: number): Promise<Basket[]> {
+export async function listBaskets(sessionIds: number[]): Promise<Basket[]> {
   const rows = await db
     .select()
     .from(baskets)
-    .where(eq(baskets.sessionId, sessionId))
+    .where(inArray(baskets.sessionId, sessionIds))
     .orderBy(asc(baskets.position), asc(baskets.id));
   const counts = await db
     .select({ basketId: prompts.basketId, total: sql<number>`count(*)::int` })
     .from(prompts)
-    .where(and(eq(prompts.sessionId, sessionId), eq(prompts.isArchived, false)))
+    .where(and(inArray(prompts.sessionId, sessionIds), eq(prompts.isArchived, false)))
     .groupBy(prompts.basketId);
   const totals = new Map(counts.map((row) => [row.basketId, Number(row.total)]));
   return rows.map((row) => ({
     id: row.id,
     name: row.name,
     position: row.position,
+    sessionId: row.sessionId,
     promptCount: totals.get(row.id) ?? 0,
   }));
 }
 
-export async function listBlocks(sessionId: number, includeArchived = false): Promise<PromptBlock[]> {
+export async function listBlocks(sessionIds: number[], includeArchived = false): Promise<PromptBlock[]> {
   const rows = await db
     .select()
     .from(prompts)
     .where(
       and(
-        eq(prompts.sessionId, sessionId),
+        inArray(prompts.sessionId, sessionIds),
         includeArchived ? sql`true` : eq(prompts.isArchived, false),
       ),
     )
@@ -88,13 +91,13 @@ export async function listBlocks(sessionId: number, includeArchived = false): Pr
   return rows.map(mapBlock);
 }
 
-export async function listTagColors(sessionId: number): Promise<TagColor[]> {
+export async function listTagColors(sessionIds: number[]): Promise<TagColor[]> {
   const rows = await db
     .select()
     .from(tagColors)
-    .where(eq(tagColors.sessionId, sessionId))
+    .where(inArray(tagColors.sessionId, sessionIds))
     .orderBy(asc(tagColors.tag));
-  return rows.map((row) => ({ tag: row.tag, hue: row.hue, lightness: row.lightness }));
+  return rows.map((row) => ({ tag: row.tag, hue: row.hue, lightness: row.lightness, sessionId: row.sessionId }));
 }
 
 export async function uniqueSlug(name: string, ignoreId?: number): Promise<string> {
@@ -119,11 +122,11 @@ export async function uniqueSlug(name: string, ignoreId?: number): Promise<strin
   return `${base}-${Date.now().toString(36)}`;
 }
 
-export async function getComposition(sessionId: number, id: number): Promise<Composition | null> {
+export async function getComposition(sessionIds: number[], id: number): Promise<Composition | null> {
   const head = await db
     .select()
     .from(compositions)
-    .where(and(eq(compositions.id, id), eq(compositions.sessionId, sessionId)))
+    .where(and(inArray(compositions.sessionId, sessionIds), eq(compositions.id, id)))
     .limit(1);
   if (!head[0]) return null;
   const items = await db
@@ -135,6 +138,7 @@ export async function getComposition(sessionId: number, id: number): Promise<Com
     id: head[0].id,
     title: head[0].title,
     description: head[0].description,
+    sessionId: head[0].sessionId,
     items: items.map((item) => ({
       id: item.id,
       compositionId: item.compositionId,
@@ -147,15 +151,15 @@ export async function getComposition(sessionId: number, id: number): Promise<Com
   };
 }
 
-export async function listCompositions(sessionId: number): Promise<Composition[]> {
+export async function listCompositions(sessionIds: number[]): Promise<Composition[]> {
   const heads = await db
     .select()
     .from(compositions)
-    .where(eq(compositions.sessionId, sessionId))
+    .where(inArray(compositions.sessionId, sessionIds))
     .orderBy(desc(compositions.updatedAt));
   const out: Composition[] = [];
   for (const head of heads) {
-    const full = await getComposition(sessionId, head.id);
+    const full = await getComposition(sessionIds, head.id);
     if (full) out.push(full);
   }
   return out;
@@ -177,8 +181,8 @@ export async function publicStackBySlug(slug: string) {
 }
 
 /** Lineage lookups: ancestors walk up, descendants walk down. */
-export async function lineageFor(sessionId: number, blockId: number) {
-  const all = await listBlocks(sessionId, true);
+export async function lineageFor(sessionIds: number[], blockId: number) {
+  const all = await listBlocks(sessionIds, true);
   const byId = new Map(all.map((b) => [b.id, b]));
   const self = byId.get(blockId);
   const ancestors: PromptBlock[] = [];
@@ -202,21 +206,21 @@ export async function lineageFor(sessionId: number, blockId: number) {
 }
 
 /** Unused stacks / null-stack helpers used by the composer palette. */
-export async function unassignedBlocks(sessionId: number): Promise<PromptBlock[]> {
+export async function unassignedBlocks(sessionIds: number[]): Promise<PromptBlock[]> {
   const rows = await db
     .select()
     .from(prompts)
-    .where(and(eq(prompts.sessionId, sessionId), eq(prompts.isArchived, false), isNull(prompts.stackId)))
+    .where(and(inArray(prompts.sessionId, sessionIds), eq(prompts.isArchived, false), isNull(prompts.stackId)))
     .orderBy(asc(prompts.id));
   return rows.map(mapBlock);
 }
 
-export async function blocksByIds(sessionId: number, ids: number[]): Promise<PromptBlock[]> {
+export async function blocksByIds(sessionIds: number[], ids: number[]): Promise<PromptBlock[]> {
   if (!ids.length) return [];
   const rows = await db
     .select()
     .from(prompts)
-    .where(and(eq(prompts.sessionId, sessionId), or(...ids.map((id) => eq(prompts.id, id)))));
+    .where(and(inArray(prompts.sessionId, sessionIds), or(...ids.map((id) => eq(prompts.id, id)))));
   return rows.map(mapBlock);
 }
 

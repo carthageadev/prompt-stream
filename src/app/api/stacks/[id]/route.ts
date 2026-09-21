@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { prompts, stacks } from "@/db/schema";
 import { guard, json, readBody, slugify } from "@/lib/http";
 import { mapStack, uniqueSlug } from "@/lib/data";
-import { requireSessionId } from "@/lib/session";
+import { resolveSessions } from "@/lib/session";
 import { STACK_THEMES } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -26,8 +26,9 @@ export async function PATCH(request: Request, ctx: Ctx) {
     slug?: string | null;
   }>(request);
   if (!body) return json({ error: "invalid body" }, 400);
-  const sessionId = await requireSessionId(request);
-  if (typeof sessionId !== "number") return sessionId;
+  const resolved = await resolveSessions(request);
+  if (!("active" in resolved)) return resolved;
+  const sessionId = resolved.active;
 
   const existing = await db
     .select()
@@ -70,8 +71,9 @@ export async function DELETE(request: Request, ctx: Ctx) {
   const { id } = await ctx.params;
   const stackId = Number(id);
   if (!Number.isFinite(stackId)) return json({ error: "invalid id" }, 400);
-  const sessionId = await requireSessionId(request);
-  if (typeof sessionId !== "number") return sessionId;
+  const resolved = await resolveSessions(request);
+  if (!("active" in resolved)) return resolved;
+  const sessionId = resolved.active;
 
   await db
     .update(prompts)

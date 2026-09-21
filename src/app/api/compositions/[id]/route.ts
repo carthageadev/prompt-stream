@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { compositionItems, compositions } from "@/db/schema";
 import { guard, json, readBody } from "@/lib/http";
 import { getComposition } from "@/lib/data";
-import { requireSessionId } from "@/lib/session";
+import { resolveSessions } from "@/lib/session";
 import { COMPOSITION_SECTIONS } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -29,9 +29,9 @@ export async function GET(request: Request, ctx: Ctx) {
   if (blocked) return blocked;
   const id = await resolveId(ctx);
   if (!id) return json({ error: "invalid id" }, 400);
-  const sessionId = await requireSessionId(request);
-  if (typeof sessionId !== "number") return sessionId;
-  const composition = await getComposition(sessionId, id);
+  const resolved = await resolveSessions(request);
+  if (!("active" in resolved)) return resolved;
+  const composition = await getComposition(resolved.visible, id);
   if (!composition) return json({ error: "not found" }, 404);
   return json({ composition });
 }
@@ -45,8 +45,9 @@ export async function PATCH(request: Request, ctx: Ctx) {
 
   const body = await readBody<{ title?: string; description?: string; items?: ItemPayload[] }>(request);
   if (!body) return json({ error: "invalid body" }, 400);
-  const sessionId = await requireSessionId(request);
-  if (typeof sessionId !== "number") return sessionId;
+  const resolved = await resolveSessions(request);
+  if (!("active" in resolved)) return resolved;
+  const sessionId = resolved.active;
 
   const existing = await db
     .select()
@@ -81,7 +82,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
     if (rows.length) await db.insert(compositionItems).values(rows);
   }
 
-  const composition = await getComposition(sessionId, id);
+  const composition = await getComposition(resolved.visible, id);
   return json({ composition });
 }
 
@@ -90,8 +91,9 @@ export async function DELETE(request: Request, ctx: Ctx) {
   if (blocked) return blocked;
   const id = await resolveId(ctx);
   if (!id) return json({ error: "invalid id" }, 400);
-  const sessionId = await requireSessionId(request);
-  if (typeof sessionId !== "number") return sessionId;
+  const resolved = await resolveSessions(request);
+  if (!("active" in resolved)) return resolved;
+  const sessionId = resolved.active;
   const owned = await db
     .select({ id: compositions.id })
     .from(compositions)

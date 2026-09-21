@@ -3,23 +3,24 @@ import { db } from "@/db";
 import { prompts, stacks } from "@/db/schema";
 import { guard, json, readBody } from "@/lib/http";
 import { listStacks, mapStack } from "@/lib/data";
-import { requireSessionId } from "@/lib/session";
+import { resolveSessions } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const blocked = guard(request);
   if (blocked) return blocked;
-  const sessionId = await requireSessionId(request);
-  if (typeof sessionId !== "number") return sessionId;
-  return json({ stacks: await listStacks(sessionId) });
+  const resolved = await resolveSessions(request);
+  if (!("active" in resolved)) return resolved;
+  return json({ stacks: await listStacks(resolved.visible) });
 }
 
 export async function POST(request: Request) {
   const blocked = guard(request);
   if (blocked) return blocked;
-  const sessionId = await requireSessionId(request);
-  if (typeof sessionId !== "number") return sessionId;
+  const resolved = await resolveSessions(request);
+  if (!("active" in resolved)) return resolved;
+  const sessionId = resolved.active;
   const body = await readBody<{ name?: string; theme?: string; description?: string }>(request);
   const name = body?.name?.trim();
   if (!name) return json({ error: "name is required" }, 400);
@@ -39,8 +40,9 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   const blocked = guard(request);
   if (blocked) return blocked;
-  const sessionId = await requireSessionId(request);
-  if (typeof sessionId !== "number") return sessionId;
+  const resolved = await resolveSessions(request);
+  if (!("active" in resolved)) return resolved;
+  const sessionId = resolved.active;
   const id = Number(new URL(request.url).searchParams.get("id"));
   if (!Number.isFinite(id)) return json({ error: "invalid id" }, 400);
   await db

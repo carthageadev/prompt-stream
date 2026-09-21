@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { tagColors } from "@/db/schema";
 import { guard, json, readBody } from "@/lib/http";
 import { listTagColors } from "@/lib/data";
-import { requireSessionId } from "@/lib/session";
+import { resolveSessions } from "@/lib/session";
 import { deriveTagColor } from "@/lib/tags";
 
 export const dynamic = "force-dynamic";
@@ -11,17 +11,18 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const blocked = guard(request);
   if (blocked) return blocked;
-  const sessionId = await requireSessionId(request);
-  if (typeof sessionId !== "number") return sessionId;
-  return json({ colors: await listTagColors(sessionId) });
+  const resolved = await resolveSessions(request);
+  if (!("active" in resolved)) return resolved;
+  return json({ colors: await listTagColors(resolved.visible) });
 }
 
 /** Upsert a colour, or auto-assign one when only the tag is supplied. */
 export async function PUT(request: Request) {
   const blocked = guard(request);
   if (blocked) return blocked;
-  const sessionId = await requireSessionId(request);
-  if (typeof sessionId !== "number") return sessionId;
+  const resolved = await resolveSessions(request);
+  if (!("active" in resolved)) return resolved;
+  const sessionId = resolved.active;
   const body = await readBody<{
     tag?: string;
     hue?: number;
@@ -49,8 +50,9 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   const blocked = guard(request);
   if (blocked) return blocked;
-  const sessionId = await requireSessionId(request);
-  if (typeof sessionId !== "number") return sessionId;
+  const resolved = await resolveSessions(request);
+  if (!("active" in resolved)) return resolved;
+  const sessionId = resolved.active;
   const tag = new URL(request.url).searchParams.get("tag");
   if (!tag) return json({ error: "tag is required" }, 400);
   await db

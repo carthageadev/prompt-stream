@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { prompts } from "@/db/schema";
 import { guard, json } from "@/lib/http";
 import { mapBlock } from "@/lib/data";
-import { requireSessionId } from "@/lib/session";
+import { resolveSessions } from "@/lib/session";
 import { autoTag } from "@/lib/tags";
 
 export const dynamic = "force-dynamic";
@@ -17,8 +17,9 @@ export async function POST(request: Request, ctx: Ctx) {
   const { id } = await ctx.params;
   const parentId = Number(id);
   if (!Number.isFinite(parentId)) return json({ error: "invalid id" }, 400);
-  const sessionId = await requireSessionId(request);
-  if (typeof sessionId !== "number") return sessionId;
+  const resolved = await resolveSessions(request);
+  if (!("active" in resolved)) return resolved;
+  const sessionId = resolved.active;
 
   const rows = await db
     .select()

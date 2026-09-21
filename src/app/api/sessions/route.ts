@@ -1,4 +1,4 @@
-import { asc, sql } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { prompts, sessions } from "@/db/schema";
 import { seedSession } from "@/lib/data";
@@ -7,7 +7,7 @@ import { isValidSessionName } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
-/** List sessions (id + name only — enough to pick yours on a new device). */
+/** List sessions (id + name + prompt count — enough to pick yours on a new device). */
 export async function GET(request: Request) {
   const blocked = guard(request);
   if (blocked) return blocked;
@@ -15,7 +15,15 @@ export async function GET(request: Request) {
     .select({ id: sessions.id, name: sessions.name })
     .from(sessions)
     .orderBy(asc(sessions.id));
-  return json({ sessions: rows });
+  const counts = await db
+    .select({ sessionId: prompts.sessionId, total: sql<number>`count(*)::int` })
+    .from(prompts)
+    .where(eq(prompts.isArchived, false))
+    .groupBy(prompts.sessionId);
+  const totals = new Map(counts.map((row) => [row.sessionId, Number(row.total)]));
+  return json({
+    sessions: rows.map((row) => ({ ...row, promptCount: totals.get(row.id) ?? 0 })),
+  });
 }
 
 /** Create a session with just a name. First session on a fresh DB gets demo content. */

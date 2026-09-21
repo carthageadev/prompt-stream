@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { db } from "@/db";
 import { compositions } from "@/db/schema";
 import { listCompositions } from "@/lib/data";
-import { currentSessionId } from "@/lib/session";
+import { currentSessionId, resolveSessions } from "@/lib/session";
 import { IconBack, IconLayers, IconPlus } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
@@ -20,9 +20,9 @@ async function createComposition() {
 }
 
 export default async function ComposeIndexPage() {
-  const sessionId = await currentSessionId();
-  if (!sessionId) redirect("/");
-  const list = await listCompositions(sessionId);
+  const resolved = await resolveSessions();
+  if (!("active" in resolved)) redirect("/");
+  const list = await listCompositions(resolved.visible);
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-14">

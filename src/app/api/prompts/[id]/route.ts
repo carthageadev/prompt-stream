@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { prompts } from "@/db/schema";
 import { guard, json, readBody } from "@/lib/http";
 import { lineageFor, mapBlock } from "@/lib/data";
-import { requireSessionId } from "@/lib/session";
+import { resolveSessions } from "@/lib/session";
 import { autoTag } from "@/lib/tags";
 import { BLOCK_TYPES } from "@/lib/types";
 
@@ -23,12 +23,12 @@ const owned = (sessionId: number, id: number) =>
 export async function GET(request: Request, ctx: Ctx) {
   const blocked = guard(request);
   if (blocked) return blocked;
-  const sessionId = await requireSessionId(request);
-  if (typeof sessionId !== "number") return sessionId;
+  const resolved = await resolveSessions(request);
+  if (!("active" in resolved)) return resolved;
   const id = await loadId(ctx);
   if (!id) return json({ error: "invalid id" }, 400);
 
-  const { self, ancestors, descendants, all } = await lineageFor(sessionId, id);
+  const { self, ancestors, descendants, all } = await lineageFor(resolved.visible, id);
   if (!self) return json({ error: "not found" }, 404);
   return json({ block: self, ancestors, descendants, library: all });
 }
@@ -50,8 +50,9 @@ type PatchBody = {
 export async function PATCH(request: Request, ctx: Ctx) {
   const blocked = guard(request);
   if (blocked) return blocked;
-  const sessionId = await requireSessionId(request);
-  if (typeof sessionId !== "number") return sessionId;
+  const resolved = await resolveSessions(request);
+  if (!("active" in resolved)) return resolved;
+  const sessionId = resolved.active;
   const id = await loadId(ctx);
   if (!id) return json({ error: "invalid id" }, 400);
 
@@ -93,8 +94,9 @@ export async function PATCH(request: Request, ctx: Ctx) {
 export async function DELETE(request: Request, ctx: Ctx) {
   const blocked = guard(request);
   if (blocked) return blocked;
-  const sessionId = await requireSessionId(request);
-  if (typeof sessionId !== "number") return sessionId;
+  const resolved = await resolveSessions(request);
+  if (!("active" in resolved)) return resolved;
+  const sessionId = resolved.active;
   const id = await loadId(ctx);
   if (!id) return json({ error: "invalid id" }, 400);
 

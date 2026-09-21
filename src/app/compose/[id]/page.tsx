@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { Composer } from "@/components/Composer";
 import { ToastProvider } from "@/components/ui";
 import { getComposition, listBlocks } from "@/lib/data";
-import { currentSessionId } from "@/lib/session";
+import { resolveSessions } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -12,9 +12,9 @@ export default async function ComposePage({ params }: { params: Promise<{ id: st
   const compositionId = Number(id);
   if (!Number.isFinite(compositionId)) notFound();
 
-  const sessionId = await currentSessionId();
-  if (!sessionId) redirect("/");
-  const [composition, blocks] = await Promise.all([getComposition(sessionId, compositionId), listBlocks(sessionId)]);
+  const resolved = await resolveSessions();
+  if (!("active" in resolved)) redirect("/");
+  const [composition, blocks] = await Promise.all([getComposition(resolved.visible, compositionId), listBlocks(resolved.visible)]);
   if (!composition) notFound();
 
   return (

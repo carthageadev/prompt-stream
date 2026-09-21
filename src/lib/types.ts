@@ -30,6 +30,7 @@ export type Basket = {
   id: number;
   name: string;
   position: number;
+  sessionId?: number | null;
   promptCount?: number;
 };
 
@@ -51,6 +52,7 @@ export type Stack = {
   coverImageUrl: string | null;
   theme: StackTheme;
   isPublic: boolean;
+  sessionId?: number | null;
   promptCount?: number;
 };
 
@@ -59,6 +61,7 @@ export type PromptBlock = {
   title: string;
   content: string;
   blockType: BlockType;
+  sessionId?: number | null;
   stackId: number | null;
   stackOrder: number;
   basketId: number | null;
@@ -76,6 +79,7 @@ export type TagColor = {
   tag: string;
   hue: number;
   lightness: number;
+  sessionId?: number | null;
 };
 
 export type CompositionSection =
@@ -118,6 +122,7 @@ export type Composition = {
   id: number;
   title: string;
   description: string;
+  sessionId?: number | null;
   items: CompositionItem[];
 };
 
