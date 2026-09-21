@@ -42,6 +42,7 @@ export function PromptCard({
   group = null,
   readOnly = false,
   bare = false,
+  tight = false,
 }: {
   block: PromptBlock;
   visible: boolean;
