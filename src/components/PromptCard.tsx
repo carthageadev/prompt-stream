@@ -56,8 +56,10 @@ export function PromptCard({
   group?: CardGroup | null;
   /** Someone else's row: no editor, no select — hide or save a copy instead. */
   readOnly?: boolean;
-  /** Melt into the parent envelope: no border, no surface, no gap — one article. */
+  /** Melt into the parent envelope: no border, no surface — one article. */
   bare?: boolean;
+  /** Collapse the bottom margin so melted cards touch edge to edge. */
+  tight?: boolean;
 }) {
   const [flash, setFlash] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -86,7 +88,8 @@ export function PromptCard({
       }}
       className={[
         "group relative z-10 break-inside-avoid cursor-pointer overflow-hidden transition-all duration-[380ms] [transition-timing-function:var(--ease)]",
-        bare ? "mb-0 border-0 bg-transparent" : "mb-3 border bg-surface",
+        bare ? "border-0 bg-transparent" : "border bg-surface",
+        tight ? "mb-0" : "mb-3",
         shown
           ? "max-h-[900px] scale-100 p-4 opacity-100"
           : "pointer-events-none mb-0 max-h-0 scale-[0.98] translate-y-3 border-0 p-0 opacity-0",

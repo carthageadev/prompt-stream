@@ -1000,8 +1000,11 @@ export function Studio({
                     };
                   })}
               />
-              {flowBlocks.map((block) => {
+              {flowBlocks.map((block, index) => {
                 const envelope = block.basketId ? groupEnvelopes.get(block.basketId) : undefined;
+                // Grouped cards melt into the shared wash: no box, no border.
+                // The GroupFields layer draws their background + outer outline.
+                const grouped = block.basketId !== null;
                 return (
                   <PromptCard
                     key={block.id}
@@ -1016,6 +1019,7 @@ export function Studio({
                     selected={selectedIds.has(block.id)}
                     onSelect={toggleSelected}
                     readOnly={!isOwn(block)}
+                    bare={grouped}
                     group={
                       envelope && block.basketId
                         ? {
@@ -1121,6 +1125,7 @@ export function Studio({
                           selected={selectedIds.has(block.id)}
                           onSelect={toggleSelected}
                           readOnly={!isOwn(block)}
+                          tight
                           bare
                         />
                       ))}
