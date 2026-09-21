@@ -87,7 +87,7 @@ export const tagColors = pgTable(
     sessionId: integer("session_id"),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("tag_colors_tag_key").on(t.tag), index("tag_colors_session_idx").on(t.sessionId)],
+  (t) => [uniqueIndex("tag_colors_tag_key").on(t.tag, t.sessionId), index("tag_colors_session_idx").on(t.sessionId)],
 );
 
 /** Compositions (ordered prompt recipes). */
@@ -112,6 +112,21 @@ export const compositionItems = pgTable(
     position: integer("position").notNull().default(0),
   },
   (t) => [index("composition_items_comp_idx").on(t.compositionId)],
+);
+
+/** Note sessions: freeform notebooks (with image attachments) living under a workspace session. */
+export const noteSessions = pgTable(
+  "note_sessions",
+  {
+    id: serial("id").primaryKey(),
+    sessionId: integer("session_id").notNull(),
+    title: text("title").notNull().default(""),
+    body: text("body").notNull().default(""),
+    attachments: jsonb("attachments").$type<{ id: string; name: string; dataUrl: string }[]>().notNull().default([]),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("note_sessions_session_idx").on(t.sessionId)],
 );
 
 /** Cached AI / heuristic insights keyed by content hash. */
