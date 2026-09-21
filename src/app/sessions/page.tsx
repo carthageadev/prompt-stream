@@ -106,7 +106,7 @@ function SessionsWorkbench() {
       .catch(() => undefined);
   }, [load]);
 
-  // Cmd/Ctrl+K → search, Cmd/Ctrl+Enter → new session.
+  // Cmd/Ctrl+K → search, Cmd/Ctrl+Enter → new note.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
@@ -211,7 +211,7 @@ function SessionsWorkbench() {
     toast.success("Image attached.");
   };
 
-  // Paste screenshots straight into a session.
+  // Paste screenshots straight into a note.
   useEffect(() => {
     const onPaste = (event: ClipboardEvent) => {
       if (!active) return;
@@ -243,7 +243,7 @@ function SessionsWorkbench() {
   }, [sessions, search]);
 
   const derivedTitle = active
-    ? active.title.trim() || active.body.trim().split("\n")[0].slice(0, 60) || "Untitled session"
+    ? active.title.trim() || active.body.trim().split("\n")[0].slice(0, 60) || "Untitled note"
     : "";
 
   const copyImage = async (attachment: Attachment) => {
@@ -281,7 +281,7 @@ function SessionsWorkbench() {
             studio
           </Link>
           <span className="h-3 w-px bg-line" />
-          <h1 className="text-[13.5px] font-semibold tracking-[-0.02em] text-ink">Sessions</h1>
+          <h1 className="text-[13.5px] font-semibold tracking-[-0.02em] text-ink">Notes</h1>
           <span className="label">
             {mode === "cloud" ? `synced · ${workspaceName ?? "session"}` : "local draft · pick a session on the studio page to sync"}
           </span>
@@ -291,12 +291,12 @@ function SessionsWorkbench() {
               ref={searchRef}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search sessions"
+              placeholder="Search notes"
               className="field focus-ring !w-52 !py-1.5 !text-[12px]"
             />
             <button type="button" onClick={createSession} className="btn btn-primary focus-ring">
               <IconPlus width={13} height={13} />
-              New session
+              New note
             </button>
           </div>
         </div>
@@ -313,7 +313,11 @@ function SessionsWorkbench() {
 
       <div className="mx-auto grid max-w-[1400px] gap-4 px-5 py-6 lg:grid-cols-[300px_1fr]">
         <aside className="surface max-h-[78vh] overflow-y-auto scroll-thin p-3">
-          {filtered.length === 0 && <p className="px-1 text-[12px] text-ink3">No sessions yet.</p>}
+          {filtered.length === 0 && (
+            <p className="px-1 text-[12px] text-ink3">
+              {mode === "cloud" && workspaceName ? `No notes in ${workspaceName} yet.` : "No notes yet."}
+            </p>
+          )}
           <ul className="space-y-1.5">
             {filtered.map((session) => (
               <li key={session.id}>
@@ -327,7 +331,7 @@ function SessionsWorkbench() {
                   }}
                 >
                   <span className="block truncate text-[12.5px] font-medium text-ink">
-                    {session.title.trim() || session.body.trim().split("\n")[0].slice(0, 60) || "Untitled session"}
+                    {session.title.trim() || session.body.trim().split("\n")[0].slice(0, 60) || "Untitled note"}
                   </span>
                   <span className="mt-0.5 flex items-center gap-2 text-[10px] text-ink3">
                     <span>{new Date(session.updatedAt).toLocaleDateString()}</span>
@@ -347,7 +351,7 @@ function SessionsWorkbench() {
                   <IconDoc width={16} height={16} />
                 </div>
                 <p className="mt-3 text-[12.5px] text-ink3">
-                  No session selected. Press <span className="kbd">⌘</span> <span className="kbd">↵</span> to start one.
+                  No note selected. Press <span className="kbd">⌘</span> <span className="kbd">↵</span> to start one.
                 </p>
               </div>
             </div>
@@ -399,7 +403,7 @@ function SessionsWorkbench() {
                 <button
                   type="button"
                   onClick={async () => {
-                    if (await copyText(active.body)) toast.success("Session copied.");
+                    if (await copyText(active.body)) toast.success("Note copied.");
                   }}
                   className="btn btn-ghost focus-ring !py-1 !text-[11.5px]"
                 >

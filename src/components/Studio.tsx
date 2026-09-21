@@ -742,7 +742,7 @@ export function Studio({
             <IconLayers width={13} height={13} /> Compose
           </Link>
           <Link href="/sessions" className="btn btn-ghost focus-ring w-full !justify-start !px-2 !text-[12px]">
-            <IconDoc width={13} height={13} /> Sessions
+            <IconDoc width={13} height={13} /> Notes
           </Link>
           <button type="button" onClick={() => setFilter("archived")} className="btn btn-ghost focus-ring w-full !justify-start !px-2 !text-[12px]">
             <IconArchive width={13} height={13} /> Archives
