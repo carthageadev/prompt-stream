@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { restoreVisibleFor, writeSessionCookie } from "@/lib/session-client";
+import { Spinner } from "./ui";
 
 export type SessionRef = { id: number; name: string };
-
-export function writeSessionCookie(id: number) {
-  document.cookie = `ps_session=${id}; path=/; max-age=31536000; samesite=lax`;
-}
 
 /** First-visit onboarding + session switcher. Name-only, no password. */
 export function SessionGate({
@@ -44,6 +42,7 @@ export function SessionGate({
 
   const enter = (session: SessionRef) => {
     writeSessionCookie(session.id);
+    restoreVisibleFor(session.id);
     onDone(session);
   };
 
