@@ -1121,6 +1121,7 @@ export function Studio({
                           selected={selectedIds.has(block.id)}
                           onSelect={toggleSelected}
                           readOnly={!isOwn(block)}
+                          bare
                         />
                       ))}
                     </div>
