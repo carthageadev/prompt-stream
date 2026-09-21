@@ -700,7 +700,7 @@ export function Studio({
   const showEmpty = pool.length === 0 && filter !== "archived";
 
   return (
-    <div className={`min-h-screen md:pl-[208px] ${rackOpen ? "lg:pr-[380px]" : ""}`}>
+    <div className="min-h-screen md:pl-[208px]">
       {/* Quiet workspace rail: navigation replaces the old control bar. */}
       <aside className="fixed inset-y-0 left-0 z-[70] hidden w-[208px] border-r border-line bg-elev md:flex md:flex-col">
         <Link href="/" className="flex h-14 items-center gap-2 border-b border-line px-5">
