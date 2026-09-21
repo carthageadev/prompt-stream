@@ -12,7 +12,8 @@ export type GroupFieldMeta = {
 };
 
 type Rect = { x: number; y: number; width: number; height: number };
-type Field = GroupFieldMeta & { rects: Rect[]; bridges: Rect[]; anchor: Rect };
+type Field = GroupFieldMeta & { rects: Rect[]; bridges: Rect[]; strokes: Rect[]; anchor: Rect };
+type Link = { vertical: boolean; upper: number; lower: number; left: number; right: number; mid: number };
 
 const intersects = (a: Rect, b: Rect) =>
   a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
@@ -71,6 +72,7 @@ export function GroupFields({ groups }: { groups: GroupFieldMeta[] }) {
             height: rect.height + pad * 2,
           }));
           const bridges: Rect[] = [];
+          const links: Link[] = [];
 
           for (let i = 0; i < raw.length; i += 1) {
             for (let j = i + 1; j < raw.length; j += 1) {
@@ -95,6 +97,14 @@ export function GroupFields({ groups }: { groups: GroupFieldMeta[] }) {
                   width: overlapX + pad * 2,
                   height: verticalGap + pad * 2,
                 };
+                links.push({
+                  vertical: true,
+                  upper: a.y <= b.y ? i : j,
+                  lower: a.y <= b.y ? j : i,
+                  left: -1,
+                  right: -1,
+                  mid: Math.round((upper.y + upper.height + lower.y) / 2),
+                });
               }
 
               // Horizontal neighbors on the same visual row.
@@ -109,6 +119,14 @@ export function GroupFields({ groups }: { groups: GroupFieldMeta[] }) {
                     width: horizontalGap + pad * 2,
                     height: overlapY + pad * 2,
                   };
+                  links.push({
+                    vertical: false,
+                    upper: -1,
+                    lower: -1,
+                    left: a.x <= b.x ? i : j,
+                    right: a.x <= b.x ? j : i,
+                    mid: Math.round((left.x + left.width + right.x) / 2),
+                  });
                 }
               }
 
@@ -121,8 +139,33 @@ export function GroupFields({ groups }: { groups: GroupFieldMeta[] }) {
             }
           }
 
+          // Fuse shared edges: bridged rects meet exactly mid-gap so touching
+          // outlines paint as one continuous line instead of a double border.
+          const strokes = rects.map((rect) => ({ ...rect }));
+          for (const link of links) {
+            if (link.vertical) {
+              const up = strokes[link.upper];
+              const lo = strokes[link.lower];
+              if (up && lo) {
+                up.height = Math.max(1, link.mid - up.y);
+                const loBottom = lo.y + lo.height;
+                lo.y = link.mid;
+                lo.height = Math.max(1, loBottom - link.mid);
+              }
+            } else {
+              const left = strokes[link.left];
+              const right = strokes[link.right];
+              if (left && right) {
+                left.width = Math.max(1, link.mid - left.x);
+                const rightEdge = right.x + right.width;
+                right.x = link.mid;
+                right.width = Math.max(1, rightEdge - link.mid);
+              }
+            }
+          }
+
           const anchor = [...raw].sort((a, b) => a.y - b.y || a.x - b.x)[0];
-          next.push({ ...group, rects, bridges, anchor });
+          next.push({ ...group, rects, bridges, strokes, anchor });
         }
         setFields(next);
       });
@@ -157,18 +200,15 @@ export function GroupFields({ groups }: { groups: GroupFieldMeta[] }) {
                 .join(" ")}
               fill={field.fill}
             />
-            {field.rects.map((rect, index) => (
-              <rect
-                key={index}
-                x={rect.x}
-                y={rect.y}
-                width={rect.width}
-                height={rect.height}
-                fill="none"
-                stroke={field.outline}
-                strokeWidth="1"
-              />
-            ))}
+            {/* One outline path: fused edges coincide, so touching cards share a single line. */}
+            <path
+              d={field.strokes
+                .map((rect) => `M${rect.x},${rect.y}h${rect.width}v${rect.height}h-${rect.width}Z`)
+                .join(" ")}
+              fill="none"
+              stroke={field.outline}
+              strokeWidth="1"
+            />
           </g>
         ))}
       </svg>
