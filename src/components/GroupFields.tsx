@@ -36,9 +36,20 @@ export function GroupFields({ groups }: { groups: GroupFieldMeta[] }) {
     }
 
     let frame = 0;
-    const measure = () => {
+    const apply = (next: Field[]) => {
+      // No-op when nothing changed: keeps the effect from render-looping.
+      setFields((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
+    };
+    const measure = (immediate = false) => {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
+      frame = 0;
+      if (immediate) {
+        compute();
+        return;
+      }
+      frame = requestAnimationFrame(compute);
+    };
+    const compute = () => {
         const hostBox = host.getBoundingClientRect();
         const allCards = Array.from(host.querySelectorAll<HTMLElement>("[data-card-group]"))
           .map((element) => ({
@@ -232,19 +243,19 @@ export function GroupFields({ groups }: { groups: GroupFieldMeta[] }) {
           const anchor = [...raw].sort((a, b) => a.y - b.y || a.x - b.x)[0];
           next.push({ ...group, rects, bridges, strokes: outlineRects, anchor });
         }
-        setFields(next);
-      });
+        apply(next);
     };
 
-    measure();
-    const observer = new ResizeObserver(measure);
+    measure(true);
+    const onResize = () => measure();
+    const observer = new ResizeObserver(onResize);
     observer.observe(host);
     host.querySelectorAll<HTMLElement>("[data-card-group]").forEach((card) => observer.observe(card));
-    window.addEventListener("resize", measure);
+    window.addEventListener("resize", onResize);
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
-      window.removeEventListener("resize", measure);
+      window.removeEventListener("resize", onResize);
     };
   }, [groups]);
 

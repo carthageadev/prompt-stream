@@ -683,6 +683,25 @@ export function Studio({
     return map;
   }, [baskets, colors]);
 
+  /** Stable group metadata so the field layer only re-measures on real changes. */
+  const groupFieldMetas = useMemo(
+    () =>
+      basketSections.sections
+        .filter(({ basket }) => !collapsedBaskets.includes(basket.id))
+        .map(({ basket }) => {
+          const envelope = groupEnvelopes.get(basket.id)!;
+          return {
+            id: basket.id,
+            name: basket.name,
+            fill: envelope.wash,
+            outline: envelope.outline,
+            label: envelope.label,
+            dot: envelope.dot,
+          };
+        }),
+    [basketSections, collapsedBaskets, groupEnvelopes],
+  );
+
   /** Flow view: one natural stream. Collapsed groups are lifted out into a strip. */
   const flowBlocks = useMemo(
     () => orderedVisible.filter((block) => !(block.basketId && collapsedBaskets.includes(block.basketId))),
@@ -985,26 +1004,9 @@ export function Studio({
               </div>
             )}
             <div className="masonry relative" style={{ columnCount: columns, columnGap: "12px" }}>
-              <GroupFields
-                groups={basketSections.sections
-                  .filter(({ basket }) => !collapsedBaskets.includes(basket.id))
-                  .map(({ basket }) => {
-                    const envelope = groupEnvelopes.get(basket.id)!;
-                    return {
-                      id: basket.id,
-                      name: basket.name,
-                      fill: envelope.wash,
-                      outline: envelope.outline,
-                      label: envelope.label,
-                      dot: envelope.dot,
-                    };
-                  })}
-              />
-              {flowBlocks.map((block, index) => {
+              <GroupFields groups={groupFieldMetas} />
+              {flowBlocks.map((block) => {
                 const envelope = block.basketId ? groupEnvelopes.get(block.basketId) : undefined;
-                // Grouped cards melt into the shared wash: no box, no border.
-                // The GroupFields layer draws their background + outer outline.
-                const grouped = block.basketId !== null;
                 return (
                   <PromptCard
                     key={block.id}
@@ -1019,7 +1021,6 @@ export function Studio({
                     selected={selectedIds.has(block.id)}
                     onSelect={toggleSelected}
                     readOnly={!isOwn(block)}
-                    bare={grouped}
                     group={
                       envelope && block.basketId
                         ? {
@@ -1125,7 +1126,6 @@ export function Studio({
                           selected={selectedIds.has(block.id)}
                           onSelect={toggleSelected}
                           readOnly={!isOwn(block)}
-                          tight
                           bare
                         />
                       ))}
