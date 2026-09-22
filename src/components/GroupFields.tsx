@@ -289,22 +289,29 @@ export function GroupFields({ groups }: { groups: GroupFieldMeta[] }) {
         ))}
       </svg>
 
-      {fields.map((field) => (
-        <div
-          key={field.id}
-          className="absolute z-20 flex items-center gap-1.5 border bg-elev px-1.5 py-[2px] font-mono text-[9px] font-medium uppercase tracking-[0.1em] shadow-[var(--shadow-1)]"
-          style={{
-            left: Math.max(0, field.anchor.x + 7),
-            top: Math.max(0, field.anchor.y - 10),
-            maxWidth: Math.max(80, field.anchor.width - 14),
-            color: field.label,
-            borderColor: field.outline,
-          }}
-        >
-          <span className="h-[5px] w-[5px]" style={{ background: field.dot }} />
-          {field.name}
-        </div>
-      ))}
+      {fields.map((field) => {
+        const boxes = [...field.rects, ...field.bridges];
+        const x0 = Math.max(0, Math.min(...boxes.map((r) => r.x)));
+        const y0 = Math.min(...boxes.map((r) => r.y));
+        const x1 = Math.max(...boxes.map((r) => r.x + r.width));
+        return (
+          <div
+            key={field.id}
+            className="absolute z-20 flex items-center gap-1.5 border bg-elev px-1.5 py-[2px] font-mono text-[9px] font-medium uppercase tracking-[0.1em] shadow-[var(--shadow-1)]"
+            style={{
+              left: x0,
+              top: y0,
+              transform: "translateY(-50%)",
+              maxWidth: Math.max(80, x1 - x0 - 14),
+              color: field.label,
+              borderColor: field.outline,
+            }}
+          >
+            <span className="h-[5px] w-[5px]" style={{ background: field.dot }} />
+            {field.name}
+          </div>
+        );
+      })}
     </div>
   );
 }
